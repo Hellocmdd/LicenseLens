@@ -102,7 +102,7 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
 | --- | --- | --- | --- |
 | A（待填） | 待填 | 待填 | 待填 |
 | B（待填） | 待填 | 待填 | 待填 |
-| C（待填） | 待填 | 待填 | 待填 |
+| GeneralDXL（2024302111046） | 待填 | 待填 | 待填 |
 
 ## 许可与已知限制
 

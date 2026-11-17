@@ -14,7 +14,7 @@
 | --- | --- | --- | --- |
 | A | 待填 | 核心架构与 SPI 契约 | 待填 |
 | B | 待填 | npm 独立扩展开发者 | 待填 |
-| C | 待填 | Maven 解析器 + CLI + 发布组织者 | 待填 |
+| C | 2024302111046 | Maven 解析器 + CLI + 发布组织者 | GeneralDXL |
 
 ---
 
@@ -332,6 +332,6 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | --- | --- | --- |
 | A | | |
 | B | | |
-| C | | |
+| C | GeneralDXL | 2026-11-17 |
 
 **签字后本文档正式生效。** 任何变更须走 CONTRACT.md 变更流程，三人都同意后才能修改。
