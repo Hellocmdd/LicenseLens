@@ -1,0 +1,33 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build and Test
+        run: mvn -B clean verify
+
+      # npm 插件是独立 reactor，单独构建（验证独立构建能力）
+      - name: Install parent + SPI then build npm plugin
+        run: |
+          mvn -B -N install -DskipTests
+          mvn -B -pl licenselens-spi install -DskipTests
+          cd plugins/licenselens-npm
+          mvn -B clean verify
