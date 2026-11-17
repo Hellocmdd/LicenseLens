@@ -24,10 +24,10 @@ jobs:
       - name: Build and Test
         run: mvn -B clean verify
 
-      # npm 插件是独立 reactor，单独构建（验证独立构建能力）
-      - name: Install parent + SPI then build npm plugin
+      # npm 与 go 插件是独立 reactor，单独构建（验证独立构建能力）
+      - name: Install parent + SPI then build plugins
         run: |
           mvn -B -N install -DskipTests
           mvn -B -pl licenselens-spi install -DskipTests
-          cd plugins/licenselens-npm
-          mvn -B clean verify
+          (cd plugins/licenselens-npm && mvn -B clean verify)
+          (cd plugins/licenselens-go && mvn -B clean verify)
