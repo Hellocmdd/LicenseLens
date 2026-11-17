@@ -8,7 +8,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -21,13 +25,20 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build and Test
+      - name: Build and Test core reactor
         run: mvn -B clean verify
 
-      # npm 与 go 插件是独立 reactor，单独构建（验证独立构建能力）
-      - name: Install parent + SPI then build plugins
+      # 独立插件 reactor：先安装 parent + SPI，再逐个构建
+      # 用 working-directory 而非 cd && ...，保证 Ubuntu/PowerShell 通用
+      - name: Install parent + SPI
         run: |
           mvn -B -N install -DskipTests
           mvn -B -pl licenselens-spi install -DskipTests
-          (cd plugins/licenselens-npm && mvn -B clean verify)
-          (cd plugins/licenselens-go && mvn -B clean verify)
+
+      - name: Build npm plugin
+        working-directory: plugins/licenselens-npm
+        run: mvn -B clean verify
+
+      - name: Build go plugin
+        working-directory: plugins/licenselens-go
+        run: mvn -B clean verify
