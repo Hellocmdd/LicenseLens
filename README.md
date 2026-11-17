@@ -86,7 +86,7 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
 
 ## 测试与检查
 
-构建即检查：`mvn -B clean verify` 同时执行编译与测试。CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，依次构建核心 reactor、安装 parent+spi、独立构建 npm 扩展。本地已按相同命令序列验证通过；远端真实运行记录以 GitHub Actions 页面为准。
+构建即检查：`mvn -B clean verify` 同时执行编译与测试。CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上分别构建核心 reactor、安装 parent+spi、独立构建 npm 与 Go 扩展。本地已按相同命令序列验证通过；远端真实运行记录以 GitHub Actions 页面为准。
 
 当前测试文件尚未编写，计划覆盖：正常流程、策略差异、空输入、非预期输入、文件不存在、语法错误、扩展接入生效与移走、扩展契约。故意改错演示计划中：修改报告排序比较器使测试失败，恢复后通过。
 
