@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build core reactor
+        run: mvn -B clean verify
+
+      - name: Install parent + SPI
+        run: |
+          mvn -B -N install -DskipTests
+          mvn -B -pl licenselens-spi install -DskipTests
+
+      - name: Build plugins
+        run: |
+          (cd plugins/licenselens-npm && mvn -B clean verify)
+          (cd plugins/licenselens-go && mvn -B clean verify)
+
+      - name: Package distribution
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          STAGE="licenselens-${TAG}"
+          mkdir -p "$STAGE/bin" "$STAGE/plugins"
+          cp licenselens-cli/target/licenselens-cli-*.jar "$STAGE/bin/licenselens-cli.jar"
+          cp plugins/licenselens-npm/target/licenselens-npm-*.jar "$STAGE/plugins/"
+          cp plugins/licenselens-go/target/licenselens-go-*.jar "$STAGE/plugins/"
+          cp -r samples "$STAGE/samples"
+          cp README.md LICENSE "$STAGE/"
+          cat > "$STAGE/RUN.md" <<EOF
+          # LicenseLens ${TAG}
+
+          运行环境：JDK 21+
+
+          扫描 Maven 清单（内置解析器）：
+            java -jar bin/licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml
+
+          扫描 npm 清单（需启用插件）：
+            java -jar bin/licenselens-cli.jar scan --manifest samples/demo-npm/package-lock.json --plugins plugins
+
+          扫描 Go 清单（需启用插件）：
+            java -jar bin/licenselens-cli.jar scan --manifest samples/demo-go/go.mod --plugins plugins
+
+          说明：当前为骨架版本，业务方法尚未实现，扫描不会产出完整报告。
+          EOF
+          zip -rq "licenselens-${TAG}.zip" "$STAGE"
+          sha256sum "licenselens-${TAG}.zip" > "licenselens-${TAG}.zip.sha256"
+          echo "ASSET=licenselens-${TAG}.zip" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            licenselens-*.zip
+            licenselens-*.zip.sha256
+          generate_release_notes: true
+          draft: false
+          prerelease: false
