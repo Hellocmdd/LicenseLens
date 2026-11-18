@@ -40,10 +40,13 @@ jobs:
           mvn -B -N install -DskipTests
           mvn -B -pl licenselens-spi install -DskipTests
 
-      - name: Build plugins
-        run: |
-          (cd plugins/licenselens-npm && mvn -B clean verify)
-          (cd plugins/licenselens-go && mvn -B clean verify)
+      - name: Build npm plugin
+        working-directory: plugins/licenselens-npm
+        run: mvn -B clean verify
+
+      - name: Build go plugin
+        working-directory: plugins/licenselens-go
+        run: mvn -B clean verify
 
       # Linux 发行物：tar.gz + run.sh
       - name: Package distribution (Linux)
