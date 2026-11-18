@@ -59,6 +59,8 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
 
 交付物运行方式参见并列 `release/RELEASE.md`（发布阶段创建）。
 
+推送 `v*` 版本的 Tag 会触发 `.github/workflows/release.yml`：自动构建全部模块，打包成发行 ZIP（CLI fat jar + 插件 jars + samples + `RUN.md`），生成同名 `.sha256` 校验文件，并以 Tag 为版本号发布到 GitHub Releases（自动生成 Release Notes）。课程要求的 `release/RELEASE.md` 与 ZIP 内最终 SHA-256 仍按交付约定人工维护，不依赖流水线代填。
+
 ## 核心与扩展
 
 | 模块 | 职责 | 负责人 |
