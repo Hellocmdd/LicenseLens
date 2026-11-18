@@ -9,11 +9,16 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  # 双平台各自构建 + 打包平台专属发行物
+  build:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -40,46 +45,108 @@ jobs:
           (cd plugins/licenselens-npm && mvn -B clean verify)
           (cd plugins/licenselens-go && mvn -B clean verify)
 
-      # 打包与发布只需在一个平台完成：发行物是平台无关的 jar / zip
-      # 打包脚本用 bash 专有命令（zip / sha256sum / heredoc），故限定 Ubuntu
-      - name: Package distribution
-        if: matrix.os == 'ubuntu-latest'
+      # Linux 发行物：tar.gz + run.sh
+      - name: Package distribution (Linux)
+        if: matrix.platform == 'linux'
         run: |
           TAG="${GITHUB_REF_NAME}"
-          STAGE="licenselens-${TAG}"
+          PLATFORM="linux"
+          STAGE="licenselens-${TAG}-${PLATFORM}"
           mkdir -p "$STAGE/bin" "$STAGE/plugins"
           cp licenselens-cli/target/licenselens-cli-*.jar "$STAGE/bin/licenselens-cli.jar"
           cp plugins/licenselens-npm/target/licenselens-npm-*.jar "$STAGE/plugins/"
           cp plugins/licenselens-go/target/licenselens-go-*.jar "$STAGE/plugins/"
           cp -r samples "$STAGE/samples"
           cp README.md LICENSE "$STAGE/"
+          cat > "$STAGE/run.sh" <<EOF
+          #!/usr/bin/env bash
+          # LicenseLens ${TAG} — Linux 启动脚本
+          SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+          java -jar "\$SCRIPT_DIR/bin/licenselens-cli.jar" "\$@"
+          EOF
+          chmod +x "$STAGE/run.sh"
           cat > "$STAGE/RUN.md" <<EOF
-          # LicenseLens ${TAG}
+          # LicenseLens ${TAG} (Linux)
 
           运行环境：JDK 21+
 
-          扫描 Maven 清单（内置解析器）：
-            java -jar bin/licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml
+          方式一，直接运行：
+            ./run.sh scan --manifest samples/demo-maven/pom.xml
 
-          扫描 npm 清单（需启用插件）：
-            java -jar bin/licenselens-cli.jar scan --manifest samples/demo-npm/package-lock.json --plugins plugins
+          方式二，手动执行 jar：
+            java -jar bin/licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml --plugins plugins
 
-          扫描 Go 清单（需启用插件）：
-            java -jar bin/licenselens-cli.jar scan --manifest samples/demo-go/go.mod --plugins plugins
-
-          说明：当前为骨架版本，业务方法尚未实现，扫描不会产出完整报告。
+          当前为骨架版本，业务方法尚未实现，扫描不会产出完整报告。
           EOF
-          zip -rq "licenselens-${TAG}.zip" "$STAGE"
-          sha256sum "licenselens-${TAG}.zip" > "licenselens-${TAG}.zip.sha256"
-          echo "ASSET=licenselens-${TAG}.zip" >> "$GITHUB_ENV"
+          tar -czf "licenselens-${TAG}-${PLATFORM}.tar.gz" "$STAGE"
+          sha256sum "licenselens-${TAG}-${PLATFORM}.tar.gz" > "licenselens-${TAG}-${PLATFORM}.tar.gz.sha256"
 
-      - name: Publish GitHub Release
-        if: matrix.os == 'ubuntu-latest'
-        uses: softprops/action-gh-release@v2
+      # Windows 发行物：zip + run.bat
+      - name: Package distribution (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $TAG = $env:GITHUB_REF_NAME
+          $PLATFORM = "windows"
+          $STAGE = "licenselens-$TAG-$PLATFORM"
+          New-Item -ItemType Directory -Force -Path "$STAGE/bin", "$STAGE/plugins" | Out-Null
+          Copy-Item licenselens-cli/target/licenselens-cli-*.jar "$STAGE/bin/licenselens-cli.jar"
+          Copy-Item plugins/licenselens-npm/target/licenselens-npm-*.jar "$STAGE/plugins/"
+          Copy-Item plugins/licenselens-go/target/licenselens-go-*.jar "$STAGE/plugins/"
+          Copy-Item -Recurse samples "$STAGE/samples"
+          Copy-Item README.md, LICENSE "$STAGE/"
+          @"
+          @echo off
+          rem LicenseLens $TAG — Windows 启动脚本
+          java -jar "%~dp0bin\licenselens-cli.jar" %*
+          "@ | Set-Content -Encoding UTF8 "$STAGE/run.bat"
+          @"
+          # LicenseLens $TAG (Windows)
+
+          运行环境：JDK 21+
+
+          方式一，直接运行：
+            run.bat scan --manifest samples\demo-maven\pom.xml
+
+          方式二，手动执行 jar：
+            java -jar bin\licenselens-cli.jar scan --manifest samples\demo-maven\pom.xml --plugins plugins
+
+          当前为骨架版本，业务方法尚未实现，扫描不会产出完整报告。
+          "@ | Set-Content -Encoding UTF8 "$STAGE/RUN.md"
+          Compress-Archive -Path "$STAGE" -DestinationPath "licenselens-$TAG-$PLATFORM.zip"
+          $hash = (Get-FileHash "licenselens-$TAG-$PLATFORM.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  licenselens-$TAG-$PLATFORM.zip" | Set-Content -Encoding ASCII "licenselens-$TAG-$PLATFORM.zip.sha256"
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: dist-${{ matrix.platform }}
+          path: |
+            licenselens-*.tar.gz
+            licenselens-*.tar.gz.sha256
             licenselens-*.zip
             licenselens-*.zip.sha256
+          if-no-files-found: error
+
+  # 汇总双平台产物，一次性发布到同一个 Release
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: find dist -type f -printf '%f\n' | sort
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/licenselens-*
           generate_release_notes: true
           draft: false
           prerelease: false
