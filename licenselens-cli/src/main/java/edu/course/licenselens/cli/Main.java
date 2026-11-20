@@ -142,9 +142,6 @@ public class Main {
                     yield ExitCode.NO_PARSER;
                 }
             };
-        } catch (UnsupportedOperationException e) {
-            System.err.println("骨架代码，功能待实现: " + e.getMessage());
-            return ExitCode.OK; // 骨架阶段先不报致命错误
         }
     }
 }

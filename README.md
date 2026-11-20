@@ -2,7 +2,7 @@
 
 开源依赖许可证合规审计器。输入项目的依赖清单，输出带许可证风险判定的 Markdown 报告。
 
-- 仓库地址：<https://github.com/Hellocmdd/LicenseLens>（SSH：`git@github.com:Hellocmdd/LicenseLens.git`）
+- 仓库地址：[https://github.com/Hellocmdd/LicenseLens](https://github.com/Hellocmdd/LicenseLens)（SSH：`git@github.com:Hellocmdd/LicenseLens.git`）
 - 系统设计：`docs/CONTRACT.md`（扩展契约）、`docs/LicenseLens分工合作书.md`（分工与协作规则）
 - 项目状态：**骨架阶段**。公开契约、模块结构与构建流程已就绪，业务方法仍为 TODO，详见"已知限制"。
 
@@ -63,13 +63,13 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
 
 ## 核心与扩展
 
-| 模块 | 职责 | 负责人 |
-| --- | --- | --- |
-| `licenselens-spi` | 公开契约：`DependencySource` / `Policy` / `Decision` / 数据结构，零第三方依赖 | A |
-| `licenselens-core` | 扫描调度、策略引擎、报告渲染、许可证快照；内置 Maven 解析器 | A（Maven 解析器由 C 负责） |
-| `licenselens-cli` | 参数解析、退出码、`URLClassLoader + ServiceLoader` 插件加载 | C |
-| `plugins/licenselens-npm` | 独立扩展：npm `package-lock.json` 解析 | B |
-| `plugins/licenselens-go` | 独立扩展：Go `go.mod` 解析 | B |
+| 模块                        | 职责                                                                                | 负责人                     |
+| --------------------------- | ----------------------------------------------------------------------------------- | -------------------------- |
+| `licenselens-spi`         | 公开契约：`DependencySource` / `Policy` / `Decision` / 数据结构，零第三方依赖 | A                          |
+| `licenselens-core`        | 扫描调度、策略引擎、报告渲染、许可证快照；内置 Maven 解析器                         | A（Maven 解析器由 C 负责） |
+| `licenselens-cli`         | 参数解析、退出码、`URLClassLoader + ServiceLoader` 插件加载                       | C                          |
+| `plugins/licenselens-npm` | 独立扩展：npm `package-lock.json` 解析                                            | B                          |
+| `plugins/licenselens-go`  | 独立扩展：Go `go.mod` 解析                                                        | B                          |
 
 扩展只依赖 `licenselens-spi`，pom 中不得出现 `licenselens-core`。接入方式：在扩展 jar 的 `META-INF/services/edu.course.licenselens.spi.DependencySource` 中声明实现类全限定名，将 jar 放入 `--plugins` 指定目录即可；禁用则移走 jar。是否需要重启取决于 CLI 调用方式（每次运行都会重新加载插件目录）。核验"核心源码不变"的方法：对比接入前后 `licenselens-core/` 与 `licenselens-cli/` 的 Git 历史，应无改动。
 
@@ -77,18 +77,20 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
 
 ## 样例
 
-| 路径 | 说明 |
-| --- | --- |
-| `samples/demo-maven/pom.xml` | Maven 基础样例，覆盖多种许可证风险等级 |
-| `samples/demo-npm/package-lock.json` | 真实 npm 生成的 lockfileVersion 3 |
-| `samples/demo-npm/package-lock.v2.json` | v2 格式变体，用于兼容性测试 |
-| `samples/demo-go/go.mod` | 真实 `go mod tidy` 产出，直接依赖与 `// indirect` 分块 |
-| `samples/demo-go/go.single-require.mod` | 单行 require 与 `/v8` 主版本后缀变体 |
-| `samples/edge/` | 空清单与语法错误边界样例 |
+| 路径                                      | 说明                                                       |
+| ----------------------------------------- | ---------------------------------------------------------- |
+| `samples/demo-maven/pom.xml`            | Maven 基础样例，覆盖多种许可证风险等级                     |
+| `samples/demo-npm/package-lock.json`    | 真实 npm 生成的 lockfileVersion 3                          |
+| `samples/demo-npm/package-lock.v2.json` | v2 格式变体，用于兼容性测试                                |
+| `samples/demo-go/go.mod`                | 真实 `go mod tidy` 产出，直接依赖与 `// indirect` 分块 |
+| `samples/demo-go/go.single-require.mod` | 单行 require 与 `/v8` 主版本后缀变体                     |
+| `samples/edge/`                         | 空清单与语法错误边界样例                                   |
 
 ## 测试与检查
 
-构建即检查：`mvn -B clean verify` 同时执行编译与测试。CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上分别构建核心 reactor、安装 parent+spi、独立构建 npm 与 Go 扩展。本地已按相同命令序列验证通过；远端真实运行记录以 GitHub Actions 页面为准。
+构建即检查：`mvn -B clean verify` 同时执行编译、测试与 Checkstyle（`verify` 阶段绑定 `maven-checkstyle-plugin:check`）。规则集在 `config/checkstyle/checkstyle.xml`，依据项目代码风格硬约束落的最小集合；课程 L08 原始规则集未随仓库提供，拿到后以 L08 为准替换并单独说明。三个 reactor（parent、npm、Go）共用这份规则集，独立插件通过 `../../config/checkstyle/checkstyle.xml` 引用。检测到告警即构建失败，不使用 suppression 绕过。
+
+CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上分别构建核心 reactor、安装 parent+spi、独立构建 npm 与 Go 扩展；上述 `verify` 会同时触发各 reactor 的 Checkstyle。本地命令序列见"快速开始"；远端真实运行记录以 GitHub Actions 页面为准。
 
 当前测试文件尚未编写，计划覆盖：正常流程、策略差异、空输入、非预期输入、文件不存在、语法错误、扩展接入生效与移走、扩展契约。故意改错演示计划中：修改报告排序比较器使测试失败，恢复后通过。
 
@@ -100,11 +102,11 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
 
 ## 成员贡献与AI核验
 
-| 姓名/学号 | 本人实质改动及Commit/PR | 审查他人的改动及结果 | 关键决策与AI核验 |
-| --- | --- | --- | --- |
-| A（待填） | 待填 | 待填 | 待填 |
-| B（待填） | 待填 | 待填 | 待填 |
-| C（待填） | 待填 | 待填 | 待填 |
+| 姓名/学号                 | 本人实质改动及Commit/PR | 审查他人的改动及结果 | 关键决策与AI核验 |
+| ------------------------- | ----------------------- | -------------------- | ---------------- |
+| zzb/张展博(2024302111213)         | 待填                    | 待填                 | 待填             |
+| Hellocmdd/谭博友(2024302111237)   | 待填                    | 待填                 | 待填             |
+| GeneralDXL/段绪礼(2024302111046)  | 待填                    | 待填                 | 待填             |
 
 ## 许可与已知限制
 
