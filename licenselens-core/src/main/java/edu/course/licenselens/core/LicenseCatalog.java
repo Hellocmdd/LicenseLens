@@ -9,12 +9,13 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.json.JSONObject;
+
 /**
- * 许可证快照匹配。A 负责实现。
+ * 许可证快照匹配。
  * <p>
  * 数据来源：{@code licenses.json}，放在 {@code src/main/resources/}。
- * 匹配规则：精确匹配 {@link Dependency#name()}（Maven 的 groupId:artifactId 或 npm 包名）。
- * 未命中返回 UNKNOWN，**不猜测**。
+ * 匹配规则：精确匹配 {@link Dependency#name()}。未命中返回 UNKNOWN，**不猜测**。
  */
 public class LicenseCatalog {
 
@@ -33,13 +34,38 @@ public class LicenseCatalog {
     public LicenseInfo lookup(String depName) {
         LicenseInfo info = entries.get(depName);
         if (info != null) return info;
-        // 未命中 → UNKNOWN
         return new LicenseInfo(null, "未知许可证", RiskLevel.UNKNOWN);
     }
 
+    Map<String, LicenseInfo> getEntries() {
+        return entries;
+    }
+
     private Map<String, LicenseInfo> load() {
-        // TODO: A 实现——读 classpath:licenses.json，解析为 Map
-        // 暂时返回空 Map，让骨架编译通过
-        return new HashMap<>();
+        Map<String, LicenseInfo> map = new HashMap<>();
+        try (InputStream is = getClass().getResourceAsStream("/licenses.json")) {
+            if (is == null) {
+                System.err.println("WARN: licenses.json 未找到，许可证快照为空");
+                return map;
+            }
+            String content = new String(is.readAllBytes());
+            JSONObject root = new JSONObject(content);
+            for (String key : root.keySet()) {
+                JSONObject obj = root.getJSONObject(key);
+                String spdxId = obj.optString("spdxId", null);
+                String name = obj.optString("name", null);
+                String riskStr = obj.optString("risk", "UNKNOWN");
+                RiskLevel risk;
+                try {
+                    risk = RiskLevel.valueOf(riskStr);
+                } catch (IllegalArgumentException e) {
+                    risk = RiskLevel.UNKNOWN;
+                }
+                map.put(key, new LicenseInfo(spdxId, name, risk));
+            }
+        } catch (IOException e) {
+            System.err.println("WARN: licenses.json 加载失败: " + e.getMessage());
+        }
+        return map;
     }
 }
