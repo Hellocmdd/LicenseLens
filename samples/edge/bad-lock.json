@@ -1,0 +1,8 @@
+{
+  "name": "bad-lock",
+  "lockfileVersion": 2,
+  "packages": {
+    "": {
+      "dependencies": {
+        "lodash": "^4.17.21"
+  <!-- 故意不闭合大括号，测试 PARSE_ERROR 含行号 -->

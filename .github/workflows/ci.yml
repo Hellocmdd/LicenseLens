@@ -1,0 +1,44 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build and Test core reactor
+        run: mvn -B clean verify
+
+      # 独立插件 reactor：先安装 parent + SPI，再逐个构建
+      # 用 working-directory 而非 cd && ...，保证 Ubuntu/PowerShell 通用
+      - name: Install parent + SPI
+        run: |
+          mvn -B -N install -DskipTests
+          mvn -B -pl licenselens-spi install -DskipTests
+
+      - name: Build npm plugin
+        working-directory: plugins/licenselens-npm
+        run: mvn -B clean verify
+
+      - name: Build go plugin
+        working-directory: plugins/licenselens-go
+        run: mvn -B clean verify

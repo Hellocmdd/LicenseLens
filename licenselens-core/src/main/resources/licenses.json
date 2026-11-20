@@ -1,0 +1,23 @@
+{
+  "org.apache.commons:commons-lang3": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "com.google.guava:guava": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.junit.jupiter:junit-jupiter": {
+    "spdxId": "EPL-2.0",
+    "name": "Eclipse Public License 2.0",
+    "risk": "WEAK_COPYLEFT"
+  },
+  "mysql:mysql-connector-java": {
+    "spdxId": "GPL-2.0",
+    "name": "GNU General Public License v2.0",
+    "risk": "STRONG_COPYLEFT",
+    "note": "含 FOSS 例外条款，课程场景按强 copyleft 提示"
+  }
+}
