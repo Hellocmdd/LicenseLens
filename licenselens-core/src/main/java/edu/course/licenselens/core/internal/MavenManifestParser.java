@@ -5,11 +5,14 @@ import edu.course.licenselens.spi.DependencySource;
 import edu.course.licenselens.spi.ManifestRef;
 import edu.course.licenselens.spi.SourceException;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -19,6 +22,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 /**
  * 内置 Maven pom.xml 解析器。
@@ -29,14 +33,47 @@ import org.xml.sax.SAXException;
  */
 public class MavenManifestParser implements DependencySource {
 
+    /** 判定根元素时读取的头部字符数，足够覆盖 XML 声明与 {@code <project ...>} 开始标签。 */
+    private static final int HEAD_CHARS = 512;
+
     @Override
     public String id() {
         return "maven";
     }
 
+    /**
+     * 认领规则：文件名以 {@code pom.xml} 结尾，或文件头部根元素是 {@code <project>}。
+     * <p>
+     * 契约要求"文件名 + 首行特征"，但 pom 常以 {@code <?xml ...?>} 声明开头，
+     * 首行看不到 {@code <project>}；因此这里读头部若干字符判断根元素，
+     * 让 {@code samples/edge/empty.xml} 这类自定义命名的清单也能被认领。
+     */
     @Override
     public boolean supports(ManifestRef ref) {
-        return "pom.xml".equalsIgnoreCase(ref.fileName());
+        if (ref == null || ref.fileName() == null) {
+            return false;
+        }
+        if (ref.fileName().toLowerCase(Locale.ROOT).endsWith("pom.xml")) {
+            return true;
+        }
+        return looksLikeProject(ref.path());
+    }
+
+    private static boolean looksLikeProject(Path path) {
+        if (path == null) {
+            return false;
+        }
+        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            char[] buffer = new char[HEAD_CHARS];
+            int read = reader.read(buffer);
+            if (read <= 0) {
+                return false;
+            }
+            String head = new String(buffer, 0, read).replace("\uFEFF", "");
+            return head.matches("(?s).*<project[\\s>].*");
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     @Override
@@ -58,11 +95,13 @@ public class MavenManifestParser implements DependencySource {
         } catch (IOException e) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
                     "无法读取文件: " + e.getMessage());
-        } catch (SAXException e) {
-            // SAXException 不直接给行号，从消息里尝试提取
-            int line = extractLineFromSaxMessage(e.getMessage());
+        } catch (SAXParseException e) {
+            // SAXParseException 自带行号，优先用它；消息里的行号只是兜底
             throw new SourceException(SourceException.Code.PARSE_ERROR,
-                    "XML 格式错误: " + e.getMessage(), line);
+                    "XML 格式错误: " + e.getMessage(), e.getLineNumber());
+        } catch (SAXException e) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "XML 格式错误: " + e.getMessage(), extractLineFromSaxMessage(e.getMessage()));
         } catch (javax.xml.parsers.ParserConfigurationException e) {
             throw new SourceException(SourceException.Code.PARSE_ERROR,
                     "XML 解析器配置错误: " + e.getMessage());
