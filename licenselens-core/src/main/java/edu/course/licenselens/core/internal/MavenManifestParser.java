@@ -21,6 +21,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
@@ -91,6 +92,24 @@ public class MavenManifestParser implements DependencySource {
             factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
             factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
             DocumentBuilder builder = factory.newDocumentBuilder();
+            // 默认 ErrorHandler 会把 "[Fatal Error] ..." 直接打到 stderr，
+            // 这里改成静默抛出，由调用方统一转成 SourceException 的友好提示
+            builder.setErrorHandler(new ErrorHandler() {
+                @Override
+                public void warning(SAXParseException e) {
+                    // 警告不影响解析结果，忽略
+                }
+
+                @Override
+                public void error(SAXParseException e) throws SAXException {
+                    throw e;
+                }
+
+                @Override
+                public void fatalError(SAXParseException e) throws SAXException {
+                    throw e;
+                }
+            });
             doc = builder.parse(file.toFile());
         } catch (IOException e) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
@@ -111,22 +130,25 @@ public class MavenManifestParser implements DependencySource {
 
         List<Dependency> result = new ArrayList<>();
 
-        // 找所有 <dependencies> 节点（可能出现在多处，如 dependencies 直接和 management 下的）
+        // 只认真正的依赖声明：跳过 <dependencyManagement> 里被"管理"的条目，
+        // 它们不是实际依赖，计入会造成虚报；<profiles> 内的依赖暂不展开。
         NodeList depLists = doc.getElementsByTagName("dependencies");
         for (int i = 0; i < depLists.getLength(); i++) {
             Element depsContainer = (Element) depLists.item(i);
-            NodeList depNodes = depsContainer.getElementsByTagName("dependency");
+            if (isInsideDependencyManagement(depsContainer)) {
+                continue;
+            }
 
-            for (int j = 0; j < depNodes.getLength(); j++) {
-                Node depNode = depNodes.item(j);
-                if (depNode.getNodeType() != Node.ELEMENT_NODE) continue;
-                Element dep = (Element) depNode;
-
+            for (Element dep : childElements(depsContainer, "dependency")) {
+                // ${...} 属性占位符原样保留：本工具不解析 Maven 属性，
+                // 原样输出才能在报告里看出"版本未确定"，匹配不到快照时按 UNKNOWN 处理。
                 String groupId = childText(dep, "groupId");
                 String artifactId = childText(dep, "artifactId");
                 String version = childText(dep, "version");
                 String scope = childText(dep, "scope");
-                if (scope == null || scope.isEmpty()) scope = "compile";
+                if (scope == null || scope.isEmpty()) {
+                    scope = "compile";
+                }
 
                 if (groupId != null && artifactId != null) {
                     result.add(new Dependency(
@@ -142,13 +164,35 @@ public class MavenManifestParser implements DependencySource {
         return result;
     }
 
+    private static boolean isInsideDependencyManagement(Element element) {
+        for (Node parent = element.getParentNode(); parent != null; parent = parent.getParentNode()) {
+            if (parent.getNodeType() == Node.ELEMENT_NODE
+                    && "dependencyManagement".equals(parent.getNodeName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Element> childElements(Element parent, String tagName) {
+        List<Element> found = new ArrayList<>();
+        for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+            if (child.getNodeType() == Node.ELEMENT_NODE && tagName.equals(child.getNodeName())) {
+                found.add((Element) child);
+            }
+        }
+        return found;
+    }
+
     private static String childText(Element parent, String tagName) {
-        NodeList nl = parent.getElementsByTagName(tagName);
-        if (nl.getLength() == 0) return null;
-        // 只取直接子节点，避免嵌套
-        Node node = nl.item(0);
-        if (node.getParentNode() != parent) return null;
-        return node.getTextContent().trim();
+        for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+            if (child.getNodeType() != Node.ELEMENT_NODE || !tagName.equals(child.getNodeName())) {
+                continue;
+            }
+            String text = child.getTextContent().trim();
+            return text.isEmpty() ? null : text;
+        }
+        return null;
     }
 
     private static int extractLineFromSaxMessage(String msg) {
