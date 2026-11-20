@@ -3,7 +3,7 @@
 开源依赖许可证合规审计器。输入项目的依赖清单，输出带许可证风险判定的 Markdown 报告。
 
 - 仓库地址：[https://github.com/Hellocmdd/LicenseLens](https://github.com/Hellocmdd/LicenseLens)（SSH：`git@github.com:Hellocmdd/LicenseLens.git`）
-- 系统设计：`docs/CONTRACT.md`（扩展契约）、`docs/LicenseLens分工合作书.md`（分工与协作规则）
+- 系统设计：`docs/DESIGN.docx`（系统设计文档）、`docs/CONTRACT.md`（扩展契约）、`docs/LicenseLens分工合作书.md`（分工与协作规则）
 - 项目状态：**核心链路已跑通**。Maven 清单解析、许可证快照匹配、两种策略、Markdown 报告与 CLI 退出码均已实现并有测试覆盖；npm / Go 扩展在独立分支开发，尚未合并，详见"已知限制"。
 
 ## 用户、场景与范围
@@ -131,4 +131,4 @@ CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时�
 
 项目采用 MIT License，理由：课程作业以开放协作为目标，MIT 条款简单、对依赖方限制最少。关键依赖：`org.json`（core 解析 `licenses.json`）、JUnit（测试）与 Maven 插件，均按其各自许可证使用，未在仓库中捆绑第三方二进制；`org.json` 的许可证条款（JSON License 及其历史附加条款）需在发布前核对。
 
-已知限制：npm / Go 两个扩展仍在独立分支开发，尚未合并进 `master`，因此 `--plugins` 目前发现不到外部解析器（扫描 `package-lock.json` / `go.mod` 返回退出码 4 属预期行为）；`licenses.json` 仅收录 4 条常见依赖，未命中按 `UNKNOWN` 处理；参数错误复用退出码 `2`，契约暂无"用法错误"一档；报告含生成时间，两次运行不会字节一致，跨平台路径分隔符也不同；`docs/DESIGN.docx` 与 `release/RELEASE.md` 尚未完成。当前版本可对 Maven 清单产出完整审计报告，不覆盖传递依赖分析、联网查询与源码扫描。
+已知限制：npm / Go 两个扩展仍在独立分支开发，尚未合并进 `master`，因此 `--plugins` 目前发现不到外部解析器（扫描 `package-lock.json` / `go.mod` 返回退出码 4 属预期行为）；`licenses.json` 仅收录 4 条常见依赖，未命中按 `UNKNOWN` 处理；参数错误复用退出码 `2`，契约暂无"用法错误"一档；报告含生成时间，两次运行不会字节一致，跨平台路径分隔符也不同；`docs/DESIGN.docx` 已随工程提交，`release/RELEASE.md` 尚未完成。当前版本可对 Maven 清单产出完整审计报告，不覆盖传递依赖分析、联网查询与源码扫描。
