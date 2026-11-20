@@ -79,6 +79,62 @@ class MainTest {
         assertEquals(ExitCode.NO_PARSER, code);
     }
 
+    @Test
+    @DisplayName("T3 空清单：退出码 0，报告仍被写出")
+    void shouldReturnOkForEmptyManifest(@TempDir Path tmp) {
+        Path out = tmp.resolve("report.md");
+
+        ExitCode code = Main.run(new String[]{
+                "scan", "--manifest", sample("edge/empty.xml").toString(),
+                "--out", out.toString()
+        });
+
+        assertEquals(ExitCode.OK, code);
+        assertTrue(Files.exists(out));
+    }
+
+    @Test
+    @DisplayName("参数缺值（--manifest 后面没有内容）应报参数错误，不能抛异常")
+    void shouldRejectMissingOptionValue() {
+        ExitCode code = Main.run(new String[]{"scan", "--manifest"});
+
+        assertEquals(ExitCode.FILE_NOT_FOUND, code);
+    }
+
+    @Test
+    @DisplayName("未知参数：报参数错误而不是崩溃")
+    void shouldRejectUnknownFlag(@TempDir Path tmp) {
+        ExitCode code = Main.run(new String[]{
+                "scan", "--manifest", sample("demo-maven/pom.xml").toString(), "--bogus"
+        });
+
+        assertEquals(ExitCode.FILE_NOT_FOUND, code);
+    }
+
+    @Test
+    @DisplayName("未知策略：在扫描前拦下，退出码 2 而不是抛 IllegalArgumentException")
+    void shouldRejectUnknownPolicy(@TempDir Path tmp) {
+        ExitCode code = Main.run(new String[]{
+                "scan", "--manifest", sample("demo-maven/pom.xml").toString(),
+                "--policy", "no-such-policy",
+                "--out", tmp.resolve("report.md").toString()
+        });
+
+        assertEquals(ExitCode.FILE_NOT_FOUND, code);
+    }
+
+    @Test
+    @DisplayName("插件目录不存在：只告警，扫描照常进行")
+    void shouldScanWhenPluginsDirMissing(@TempDir Path tmp) {
+        ExitCode code = Main.run(new String[]{
+                "scan", "--manifest", sample("demo-maven/pom.xml").toString(),
+                "--plugins", tmp.resolve("no-such-dir").toString(),
+                "--out", tmp.resolve("report.md").toString()
+        });
+
+        assertEquals(ExitCode.BLOCKED, code);
+    }
+
     private static Path sample(String relative) {
         return repoRoot().resolve("samples").resolve(relative);
     }

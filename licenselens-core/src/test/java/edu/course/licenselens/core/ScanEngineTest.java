@@ -99,6 +99,18 @@ class ScanEngineTest {
                 () -> engine.scan(sample("demo-maven/pom.xml"), "no-such-policy"));
     }
 
+    @Test
+    @DisplayName("T4 依赖名是 ${...} 占位符：保留原名，快照匹配不到按 UNKNOWN 计")
+    void shouldCountPlaceholderNameAsUnknown() throws SourceException {
+        ScanResult result = engine.scan(sample("edge/placeholder-pom.xml"), "campus");
+
+        assertEquals(2, result.totalCount());
+        assertEquals(1, result.unknownCount());
+        assertEquals(0, result.exitCode());
+        assertTrue(result.reportContent().contains("${project.groupId}:sibling-module"),
+                "占位符名称应原样出现在报告里");
+    }
+
     private static Path sample(String relative) {
         return repoRoot().resolve("samples").resolve(relative);
     }

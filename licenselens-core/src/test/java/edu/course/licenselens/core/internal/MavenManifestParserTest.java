@@ -6,6 +6,7 @@ import edu.course.licenselens.spi.SourceException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -84,6 +85,58 @@ class MavenManifestParserTest {
         ManifestRef ref = new ManifestRef(Path.of("package-lock.json"), "package-lock.json", "{");
 
         assertFalse(parser.supports(ref));
+    }
+
+    @Test
+    @DisplayName("T4 坐标是 ${...} 占位符：原样保留，不解析 Maven 属性")
+    void shouldKeepPlaceholderCoordinates() throws SourceException {
+        List<Dependency> deps = parser.parse(sample("edge/placeholder-pom.xml"));
+
+        assertEquals(2, deps.size());
+        Dependency placeholderName = deps.get(0);
+        assertEquals("${project.groupId}:sibling-module", placeholderName.name());
+        assertEquals("${project.version}", placeholderName.version());
+        assertEquals("${guava.version}", deps.get(1).version());
+    }
+
+    @Test
+    @DisplayName("dependencyManagement 里的条目不是实际依赖，不应计入")
+    void shouldIgnoreDependencyManagementEntries() throws SourceException {
+        List<Dependency> deps = parser.parse(sample("edge/management-pom.xml"));
+
+        assertEquals(1, deps.size());
+        assertEquals("org.apache.commons:commons-lang3", deps.get(0).name());
+    }
+
+    @Test
+    @DisplayName("依赖内嵌 <exclusions> 时只取依赖自身坐标")
+    void shouldReadOnlyDirectChildCoordinates(@TempDir Path tmp) throws IOException, SourceException {
+        Path pom = tmp.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>demo</artifactId>
+                      <version>1.0</version>
+                      <scope>runtime</scope>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>org.excluded</groupId>
+                          <artifactId>bad</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """, StandardCharsets.UTF_8);
+
+        List<Dependency> deps = parser.parse(pom);
+
+        assertEquals(1, deps.size());
+        assertEquals("org.example:demo", deps.get(0).name());
+        assertEquals("runtime", deps.get(0).scope());
     }
 
     private static String firstLine(Path file) throws IOException {
