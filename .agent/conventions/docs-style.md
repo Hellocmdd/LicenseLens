@@ -1,6 +1,6 @@
 # docs-style.md — 文档规范
 
-适用：`README.md`、`docs/` 下全部 Markdown、`docs/DESIGN.docx`、`release/RELEASE.md`、`samples/expected/` 下的预期报告。具体文档的章节骨架由 `../docs-writer.md` 提供，本文档管通用写作与格式规则。
+适用：`README.md`、`docs/` 下全部 Markdown、`docs/DESIGN.docx`、`release/RELEASE.md`、`samples/` 下的样例说明。具体文档的章节骨架由 `../docs-writer.md` 提供，本文档管通用写作与格式规则。
 
 ## 1. 每份文档只回答一类问题
 

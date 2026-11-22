@@ -6,17 +6,17 @@
 
 | 编号 | 验证什么 | 放置位置 | 关键断言 |
 | --- | --- | --- | --- |
-| T1 | 正常流程：解析 → 匹配 → 判定 → 报告 | `licenselens-core/src/test` | 依赖条数、许可证匹配结果、报告行内容与顺序、退出码 0 |
-| T2 | 策略差异：`campus` 与 `permissive-only` 对同一输入结论不同 | core | 两策略下的 `Decision`、报告标注、退出码（0 与 1） |
-| T3 | 空输入：空 `<dependencies>`、空 `packages`、空 `require` | core | 返回空 `List` 而非 `null`；报告显示 0 条；退出码 0 |
+| T1 | 正常流程：解析 → 匹配 → 判定 → 报告 | `licenselens-core/src/test` | 依赖条数、许可证匹配结果、报告行内容与顺序；demo-maven 含 GPL 阻断，退出码 1 |
+| T2 | 策略差异：`campus` 与 `permissive-only` 对同一输入结论不同 | core | 两策略下的 `Decision`、报告标注；两个策略在 demo-maven 上均为退出码 1，差异在 EPL 是否阻断 |
+| T3 | 空输入：空 `<dependencies>`、空 `packages`、空 `require` | core | 返回空 `List` 而非 `null`；报告显示 0 条；终端摘要显示“依赖数: 0”，退出码 0 |
 | T4 | 非预期输入：缺 version、未知字段、未知许可证、非常规 scope | core | 不崩溃；未命中走 `UNKNOWN`；行为与契约一致 |
 | T5 | 文件不存在 | core + cli | `SourceException.Code.FILE_NOT_FOUND`；退出码 2；stderr 含路径 |
 | T6 | 清单语法错误 | core + cli | `PARSE_ERROR` 且 `line() > 0`；退出码 3 |
-| T7 | 扩展接入后生效：jar 放入插件目录被自动发现 | cli 集成测试 | 新格式清单能解析出预期依赖；退出码按判定结果 |
+| T7 | 扩展接入后生效：jar 放入插件目录被自动发现 | cli 集成测试（待补） | 新格式清单能解析出预期依赖；退出码按判定结果 |
 | T8 | 移走扩展后无可用解析器 | cli 集成测试 | 退出码 4；提示安装插件；不抛未捕获异常 |
-| T9 | 扩展契约：只依赖 spi 验证输入输出与错误码 | `plugins/*/src/test` | `id()`、`supports()`、`parse()` 的输出字段与 `SourceException` 码符合契约 |
+| T9 | 扩展契约：只依赖 spi 验证输入输出与错误码 | `plugins/*/src/test` | npm 39 例 + Go 40 例已覆盖 `id()`、`supports()`、`parse()` 与 `SourceException` 码 |
 
-- T1–T6 由 core/cli 侧维护；T9 由扩展侧维护，**不得依赖 core**；T7–T8 需要扩展与 CLI 都能构建，属集成测试。
+- T1–T6 由 core/cli 侧维护；T9 由扩展侧维护，**不得依赖 core**；T7 集成用例待补，T8 由 core/cli 测试覆盖。
 - 同一用例可以覆盖多类行为，但矩阵里的每一项都要有对应用例；不要用"一个超级测试"覆盖全部。
 
 ## 2. 断言要求

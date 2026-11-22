@@ -82,8 +82,8 @@
 
 ## 9. 风格检查
 
-- 当前强制门禁是 `mvn -B clean verify`（编译 + 测试）。提交前必须本地通过。
-- Checkstyle 已列入计划（复用课程 L08 规则集，纳入 verify）；接入后 `mvn -B checkstyle:check` 必须零告警，禁止用 `@SuppressWarnings` 或 suppression 文件绕过。
+- 当前强制门禁是 `mvn -B clean verify`（编译 + 测试 + Checkstyle）。提交前必须本地通过。
+- Checkstyle 已接入 `verify` 阶段，规则集为 `config/checkstyle/checkstyle.xml`（按代码风格约束落的最小集合；L08 原件未提供，拿到后替换）。必须零告警，禁止用 suppression 文件绕过。
 - 出现风格告警时优先改代码，不改规则；确需调整规则时单独提交并说明原因。
 
 ## 10. 禁止事项（硬性）
