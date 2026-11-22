@@ -27,6 +27,9 @@
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.2</junit.version>
+        <checkstyle.version>3.3.1</checkstyle.version>
+        <!-- 规则集依据 code-style.md 落的最小集合，非课程 L08 原件；拿到 L08 后替换 -->
+        <checkstyle.config.location>${maven.multiModuleProjectDirectory}/config/checkstyle/checkstyle.xml</checkstyle.config.location>
     </properties>
 
     <dependencyManagement>
@@ -71,7 +74,32 @@
                     <artifactId>maven-shade-plugin</artifactId>
                     <version>3.5.1</version>
                 </plugin>
-            </plugins>
-        </pluginManagement>
-    </build>
+        </plugins>
+    </pluginManagement>
+
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-checkstyle-plugin</artifactId>
+            <version>${checkstyle.version}</version>
+            <configuration>
+                <configLocation>${checkstyle.config.location}</configLocation>
+                <encoding>UTF-8</encoding>
+                <consoleOutput>true</consoleOutput>
+                <failsOnError>true</failsOnError>
+                <violationSeverity>error</violationSeverity>
+                <includeTestSourceDirectory>true</includeTestSourceDirectory>
+            </configuration>
+            <executions>
+                <execution>
+                    <id>checkstyle-check</id>
+                    <phase>verify</phase>
+                    <goals>
+                        <goal>check</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
 </project>

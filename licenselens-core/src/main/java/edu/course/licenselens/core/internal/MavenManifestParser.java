@@ -5,45 +5,204 @@ import edu.course.licenselens.spi.DependencySource;
 import edu.course.licenselens.spi.ManifestRef;
 import edu.course.licenselens.spi.SourceException;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.ErrorHandler;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 /**
- * 内置 Maven pom.xml 解析器。C 负责实现。
+ * 内置 Maven pom.xml 解析器。
  * <p>
- * 注意：它是 core 的**内置基础能力**，不是独立扩展——不需要通过 ServiceLoader 发现，
- * 直接在 ScanEngine 构造时注入。但它实现了 {@link DependencySource} 接口，
- * 所以可以和外部插件并列，统一调度。
+ * 用 JDK 自带 javax.xml.parsers（DOM）解析 pom.xml，
+ * 提取 {@code <dependencies>} 下每个 {@code <dependency>} 的
+ * groupId / artifactId / version / scope。
  */
 public class MavenManifestParser implements DependencySource {
+
+    /** 判定根元素时读取的头部字符数，足够覆盖 XML 声明与 {@code <project ...>} 开始标签。 */
+    private static final int HEAD_CHARS = 512;
 
     @Override
     public String id() {
         return "maven";
     }
 
+    /**
+     * 认领规则：文件名以 {@code pom.xml} 结尾，或文件头部根元素是 {@code <project>}。
+     * <p>
+     * 契约要求"文件名 + 首行特征"，但 pom 常以 {@code <?xml ...?>} 声明开头，
+     * 首行看不到 {@code <project>}；因此这里读头部若干字符判断根元素，
+     * 让 {@code samples/edge/empty.xml} 这类自定义命名的清单也能被认领。
+     */
     @Override
     public boolean supports(ManifestRef ref) {
-        // TODO: C 实现——文件名 pom.xml 且首行含 "<project"
-        return "pom.xml".equals(ref.fileName().toLowerCase());
+        if (ref == null || ref.fileName() == null) {
+            return false;
+        }
+        if (ref.fileName().toLowerCase(Locale.ROOT).endsWith("pom.xml")) {
+            return true;
+        }
+        return looksLikeProject(ref.path());
+    }
+
+    private static boolean looksLikeProject(Path path) {
+        if (path == null) {
+            return false;
+        }
+        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            char[] buffer = new char[HEAD_CHARS];
+            int read = reader.read(buffer);
+            if (read <= 0) {
+                return false;
+            }
+            String head = new String(buffer, 0, read).replace("\uFEFF", "");
+            return head.matches("(?s).*<project[\\s>].*");
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     @Override
     public List<Dependency> parse(Path file) throws SourceException {
-        // TODO: C 实现——用 JDK 自带 javax.xml.parsers 解析 pom.xml，
-        //        提取 <dependencies> 下每个 <dependency> 的
-        //        groupId / artifactId / version / scope
-        throw new UnsupportedOperationException("MavenManifestParser.parse 待实现");
+        if (!Files.exists(file)) {
+            throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
+                    "pom.xml 不存在: " + file);
+        }
+
+        Document doc;
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            // 防止 XXE 攻击
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            // 默认 ErrorHandler 会把 "[Fatal Error] ..." 直接打到 stderr，
+            // 这里改成静默抛出，由调用方统一转成 SourceException 的友好提示
+            builder.setErrorHandler(new ErrorHandler() {
+                @Override
+                public void warning(SAXParseException e) {
+                    // 警告不影响解析结果，忽略
+                }
+
+                @Override
+                public void error(SAXParseException e) throws SAXException {
+                    throw e;
+                }
+
+                @Override
+                public void fatalError(SAXParseException e) throws SAXException {
+                    throw e;
+                }
+            });
+            doc = builder.parse(file.toFile());
+        } catch (IOException e) {
+            throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
+                    "无法读取文件: " + e.getMessage());
+        } catch (SAXParseException e) {
+            // SAXParseException 自带行号，优先用它；消息里的行号只是兜底
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "XML 格式错误: " + e.getMessage(), e.getLineNumber());
+        } catch (SAXException e) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "XML 格式错误: " + e.getMessage(), extractLineFromSaxMessage(e.getMessage()));
+        } catch (javax.xml.parsers.ParserConfigurationException e) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "XML 解析器配置错误: " + e.getMessage());
+        }
+
+        doc.getDocumentElement().normalize();
+
+        List<Dependency> result = new ArrayList<>();
+
+        // 只认真正的依赖声明：跳过 <dependencyManagement> 里被"管理"的条目，
+        // 它们不是实际依赖，计入会造成虚报；<profiles> 内的依赖暂不展开。
+        NodeList depLists = doc.getElementsByTagName("dependencies");
+        for (int i = 0; i < depLists.getLength(); i++) {
+            Element depsContainer = (Element) depLists.item(i);
+            if (isInsideDependencyManagement(depsContainer)) {
+                continue;
+            }
+
+            for (Element dep : childElements(depsContainer, "dependency")) {
+                // ${...} 属性占位符原样保留：本工具不解析 Maven 属性，
+                // 原样输出才能在报告里看出"版本未确定"，匹配不到快照时按 UNKNOWN 处理。
+                String groupId = childText(dep, "groupId");
+                String artifactId = childText(dep, "artifactId");
+                String version = childText(dep, "version");
+                String scope = childText(dep, "scope");
+                if (scope == null || scope.isEmpty()) {
+                    scope = "compile";
+                }
+
+                if (groupId != null && artifactId != null) {
+                    result.add(new Dependency(
+                            "maven",
+                            groupId + ":" + artifactId,
+                            version != null ? version : "",
+                            scope
+                    ));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static boolean isInsideDependencyManagement(Element element) {
+        for (Node parent = element.getParentNode(); parent != null; parent = parent.getParentNode()) {
+            if (parent.getNodeType() == Node.ELEMENT_NODE
+                    && "dependencyManagement".equals(parent.getNodeName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Element> childElements(Element parent, String tagName) {
+        List<Element> found = new ArrayList<>();
+        for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+            if (child.getNodeType() == Node.ELEMENT_NODE && tagName.equals(child.getNodeName())) {
+                found.add((Element) child);
+            }
+        }
+        return found;
+    }
+
+    private static String childText(Element parent, String tagName) {
+        for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+            if (child.getNodeType() != Node.ELEMENT_NODE || !tagName.equals(child.getNodeName())) {
+                continue;
+            }
+            String text = child.getTextContent().trim();
+            return text.isEmpty() ? null : text;
+        }
+        return null;
+    }
+
+    private static int extractLineFromSaxMessage(String msg) {
+        if (msg == null) return -1;
+        // SAXException 消息通常形如 "... (line N, column M)"
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("line\\s+(\\d+)").matcher(msg);
+        if (m.find()) {
+            try { return Integer.parseInt(m.group(1)); }
+            catch (NumberFormatException e) { return -1; }
+        }
+        return -1;
     }
 }

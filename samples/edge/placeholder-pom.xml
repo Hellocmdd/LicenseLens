@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>edu.course.samples</groupId>
+  <artifactId>edge-placeholder</artifactId>
+  <version>1.0.0</version>
+
+  <properties>
+    <guava.version>33.0.0-jre</guava.version>
+  </properties>
+
+  <dependencies>
+    <!-- 依赖名本身是占位符：应原样保留，快照匹配不到 → UNKNOWN -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>sibling-module</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- 名称确定、版本是占位符：应匹配到快照，版本原样输出 -->
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>${guava.version}</version>
+    </dependency>
+  </dependencies>
+</project>

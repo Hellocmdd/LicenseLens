@@ -12,9 +12,9 @@
 
 | 成员 | 学号 | 主要角色 | GitHub 用户名 |
 | --- | --- | --- | --- |
-| A | 待填 | 核心架构与 SPI 契约 | 待填 |
-| B | 待填 | npm 独立扩展开发者 | 待填 |
-| C | 待填 | Maven 解析器 + CLI + 发布组织者 | 待填 |
+| A | 2024302111213 | 核心架构与 SPI 契约 | zzb（张展博） |
+| B | 2024302111237 | npm 独立扩展开发者 | Hellocmdd（谭博友） |
+| C | 2024302111046 | Maven 解析器 + CLI + 发布组织者 | GeneralDXL（段绪礼） |
 
 ---
 
@@ -29,7 +29,8 @@ licenselens/
 │   └─ internal/MavenManifestParser.java  ← C 负责（Maven 解析器，放在 core 内但独立）
 ├─ licenselens-cli/             ← C 负责（入口、参数、退出码、插件加载）
 ├─ plugins/
-│   └─ licenselens-npm/         ← B 负责（独立扩展，独立 reactor，只依赖 spi）
+│   ├─ licenselens-npm/         ← B 负责（独立扩展，独立 reactor，只依赖 spi）
+│   └─ licenselens-go/          ← B 负责（独立扩展，独立 reactor，只依赖 spi）
 ├─ docs/
 │   ├─ CONTRACT.md              ← A 起草，全组 Review
 │   └─ DESIGN.docx              ← A 主笔，B/C 各写负责模块章节
@@ -41,22 +42,23 @@ licenselens/
 
 | # | 交付项 | 类型 | 负责人 | 具体内容 | 不得触碰 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `licenselens-spi` | 代码 | A | 全部：`Dependency`、`DependencySource`、`Policy`、`Decision`、`RiskLevel`、`SourceException` | npm 扩展实现 |
-| 2 | `licenselens-core/ScanEngine` | 代码 | A | 扫描调度：选择解析器、收集结果、触发策略 | npm 扩展实现 |
-| 3 | `licenselens-core/PolicyEngine` | 代码 | A | 策略引擎：campus + permissive-only 两种策略实现 | npm 扩展实现 |
-| 4 | `licenselens-core/ReportRenderer` | 代码 | A | 报告渲染：Markdown 生成、确定性排序（风险降序→名称升序） | npm 扩展实现 |
-| 5 | `licenselens-core/licenses.json` | 数据 | A | 许可证快照：约 40 条常见 Maven 依赖，精确匹配 groupId:artifactId | npm 扩展实现 |
+| 1 | `licenselens-spi` | 代码 | A | 全部：`Dependency`、`DependencySource`、`Policy`、`Decision`、`RiskLevel`、`SourceException` | npm / Go 扩展实现 |
+| 2 | `licenselens-core/ScanEngine` | 代码 | A | 扫描调度：选择解析器、收集结果、触发策略 | npm / Go 扩展实现 |
+| 3 | `licenselens-core/PolicyEngine` | 代码 | A | 策略引擎：campus + permissive-only 两种策略实现 | npm / Go 扩展实现 |
+| 4 | `licenselens-core/ReportRenderer` | 代码 | A | 报告渲染：Markdown 生成、确定性排序（风险降序→名称升序） | npm / Go 扩展实现 |
+| 5 | `licenselens-core/licenses.json` | 数据 | A | 许可证快照：约 40 条常见 Maven 依赖，精确匹配 groupId:artifactId | npm / Go 扩展实现 |
 | 6 | `licenselens-core/internal/MavenManifestParser` | 代码 | C | Maven 清单解析：pom.xml → `List<Dependency>`，JDK 自带 XML | 核心调度、策略、报告渲染 |
-| 7 | `licenselens-cli` 全部 | 代码 | C | 入口类、参数解析（`--manifest/--policy/--plugins/--out`）、退出码、插件目录加载（URLClassLoader + ServiceLoader） | npm 扩展实现 |
+| 7 | `licenselens-cli` 全部 | 代码 | C | 入口类、参数解析（`--manifest/--policy/--plugins/--out`）、退出码、插件目录加载（URLClassLoader + ServiceLoader） | npm / Go 扩展实现 |
 | 8 | `plugins/licenselens-npm` | 代码 | B | 全部：`package-lock.json`（v1/v2/v3）→ `List<Dependency>`，实现 `DependencySource` | core 内部任何类；Maven 解析器 |
-| 9 | 核心单测（T1-T6） | 测试 | A + C | T1 正常流程、T2 策略差异、T3 空输入、T4 非预期输入、T5 文件不存在、T6 XML 语法错误 | npm 扩展测试 |
-| 10 | 扩展契约测试（T9） | 测试 | B | 不依赖 core，只验证 spi 契约：输入输出字段、错误码 | core 内部测试 |
-| 11 | 扩展集成测试（T7-T8） | 测试 | A + B | T7 放入插件后生效、T8 移走插件后退出码 4 | — |
+| 8a | `plugins/licenselens-go` | 代码 | B | 全部：`go.mod`（require 块 / 单行 require / `/vN` 主版本）→ `List<Dependency>`，实现 `DependencySource` | core 内部任何类；Maven 解析器 |
+| 9 | 核心单测（T1-T6） | 测试 | A + C | T1 正常流程、T2 策略差异、T3 空输入、T4 非预期输入、T5 文件不存在、T6 XML 语法错误 | npm / Go 扩展测试 |
+| 10 | 扩展契约测试（T9） | 测试 | B | 不依赖 core，只验证 spi 契约：npm / Go 两个扩展的输入输出字段、错误码 | core 内部测试 |
+| 11 | 扩展集成测试（T7-T8） | 测试 | A + B | T7 放入 npm / Go 插件后 CLI 自动发现、T8 移走全部插件后退出码 4 | — |
 | 12 | `docs/CONTRACT.md` | 文档 | A 起草 | 一页纸：接口签名 + 退出码表 + 错误契约 + 兼容策略 | — |
-| 13 | `docs/DESIGN.docx` | 文档 | A 主笔 | 架构图（A）、核心流程图（A）、npm 扩展接入示例（B）、CLI 退出码表（C）、测试矩阵（A+C） | — |
-| 14 | `samples/` | 样例 | 三人各出 | A：demo-maven/pom.xml + expected/report.md；B：demo-npm/package-lock.json + 三种版本 fixture；C：edge/empty.xml + edge/bad-lock.json | — |
+| 13 | `docs/DESIGN.docx` | 文档 | A 主笔 | 架构图（A）、核心流程图（A）、npm / Go 扩展接入示例（B）、CLI 退出码表（C）、测试矩阵（A+C） | — |
+| 14 | `samples/` | 样例 | 三人各出 | A：demo-maven/pom.xml + expected/report.md；B：demo-npm/package-lock.json + 三种版本 fixture、demo-go/go.mod 及变体；C：edge/empty.xml + edge/bad-lock.json | — |
 | 15 | GitHub Actions CI | 配置 | C | `mvn -B verify` push 触发，保留一次绿色运行记录 | — |
-| 16 | Checkstyle 配置 | 配置 | C | 复用 L08 的规则集，`mvn checkstyle:check` 纳入 verify | — |
+| 16 | Checkstyle 配置 | 配置 | C | `verify` 阶段绑定 `maven-checkstyle-plugin:check`；规则集在 `config/checkstyle/checkstyle.xml`，L08 原件未提供前用按代码风格约束落的最小集合，拿到 L08 后替换 | — |
 | 17 | README.md | 文档 | 三人协作 | 用户场景 + 快速开始（C）+ 核心与扩展（A）+ 测试与质量（A+C）+ 协作规则（C）+ 成员贡献表（全员填）+ AI 核验（全员填） | — |
 | 18 | RELEASE.md | 文档 | C 主填 | 版本 + Commit + Tag + SHA-256 + 运行结果，仓库外 release/ 目录 | — |
 
@@ -68,7 +70,9 @@ DependencySource (spi)                    ← A 写接口契约
     │
     ├── MavenManifestParser (core/internal)   ← C 写（内置，不是扩展）
     │
-    └── NpmManifestParser (plugins/npm)       ← B 写（独立扩展，只依赖 spi）
+    ├── NpmManifestParser (plugins/npm)       ← B 写（独立扩展，只依赖 spi）
+    │
+    └── GoModManifestParser (plugins/go)      ← B 写（独立扩展，只依赖 spi）
 
 Policy (spi)                              ← A 写接口契约
     ↑ 实现
@@ -86,9 +90,9 @@ CLI (licenselens-cli)                     ← C 写入口
 ```
 
 **铁律**：
-- B 的 npm 扩展 pom.xml 里**只允许**依赖 `licenselens-spi`，编译期阻断越界引用 core；
+- B 的 npm / Go 扩展 pom.xml 里**只允许**依赖 `licenselens-spi`，编译期阻断越界引用 core；
 - C 的 MavenManifestParser 虽然放在 core 内部，但它是**内置基础能力**，不是独立扩展；
-- A 不得修改 B 写的任何 npm 扩展文件（包括测试）——这是"扩展独立性"的直接证据。
+- A 不得修改 B 写的任何 npm / Go 扩展文件（包括测试）——这是"扩展独立性"的直接证据。
 
 ---
 
@@ -154,7 +158,7 @@ chore(ci): add checkstyle step to verify
 2. 在 CONTRACT.md 顶部加一条变更记录：
    ### 变更 2026-11-18：RiskLevel 新增 DEPRECATED
    - 原因：需要标记即将废弃的许可证
-   - 影响：core 的 Policy 实现需加 default 分支；npm 扩展不受影响
+   - 影响：core 的 Policy 实现需加 default 分支；npm / Go 扩展不受影响
 3. 全组 Review CONTRACT.md 变更
 4. 三人都同意 → 再改 Java 代码
 5. PR 标题前缀 [CONTRACT-CHANGE]
@@ -174,7 +178,7 @@ chore(ci): add checkstyle step to verify
 | **P0 契约冻结** | A 起草，全组 Review | Day 1 | CONTRACT.md 三人签字；任何业务代码不得开始 |
 | **P1 骨架搭建** | C 主建，A/B 配合 | Day 2 | parent pom + 三模块 + npm 空插件；`mvn -B compile` 全过；Checkstyle 配置就绪；CI workflow 推送 |
 | **P2 核心功能** | A + C 并行 | Day 3-4 | MavenManifestParser 能解析 demo-maven → 4 条 Dependency；ScanEngine + PolicyEngine + ReportRenderer 跑通；9 个测试全绿；故意改错演示准备好 |
-| **P3 扩展接入** | B 主写，A 接线 | Day 5 | npm 插件实现完成；放入 plugins/ 后 CLI 自动发现；移走后退出码 4；契约测试 + 集成测试全绿；A Review B 的扩展（必须提具体意见） |
+| **P3 扩展接入** | B 主写，A 接线 | Day 5 | npm / Go 插件实现完成；放入 plugins/ 后 CLI 自动发现；移走全部插件后退出码 4；契约测试 + 集成测试全绿；A Review B 的扩展（必须提具体意见） |
 | **P4 CLI 完善** | C | Day 5-6 | 参数解析 + 退出码 + 插件加载；四种失败路径退出码正确；终端摘要格式确认 |
 | **P5 故意改错演示** | A 准备，三人排练 | Day 6 | 改排序比较器 → T1 红 → 恢复 → 绿；完整流程跑一遍，计时 < 6 分钟 |
 | **P6 质量与发布** | C 主理，全组配合 | Day 6-7 | `mvn -B clean verify` 全过；CI 绿色记录；Tag v0.1.0 附注；SHA-256 计算；RELEASE.md 填写 |
@@ -186,7 +190,7 @@ chore(ci): add checkstyle step to verify
 P0：串行（三人一起 Review 契约）
 P1：串行（先建骨架再编译）
 P2：A 和 C 可以并行 ← MavenManifestParser（C）和 ScanEngine（A）互不依赖
-P3：B 可以独立写 npm 扩展（只依赖 spi，spi 在 P1 已落地）
+P3：B 可以独立写 npm / Go 扩展（只依赖 spi，spi 在 P1 已落地）
 P4：CLI 完善依赖 P2 的 ScanEngine，但 C 可以先写参数解析框架
 P5-P7：基本串行，按质量门禁推进
 ```
@@ -194,7 +198,7 @@ P5-P7：基本串行，按质量门禁推进
 **关键依赖关系**：
 ```
 spi (P1) ← core (P2) ← cli (P4)
-spi (P1) ← npm 扩展 (P3)    ← 可以和 core 并行
+spi (P1) ← npm / Go 扩展 (P3) ← 可以和 core 并行
 ```
 
 ---
@@ -205,9 +209,9 @@ spi (P1) ← npm 扩展 (P3)    ← 可以和 core 并行
 
 | 负责人 | 不得触碰的内容 | 原因 |
 | --- | --- | --- |
-| A（核心架构） | npm 扩展任何文件；npm 扩展的契约测试 | 独立扩展必须由组内另一位成员从零实现，A 未参与编写才能证明扩展接口"足以支持他人使用" |
-| B（npm 扩展） | core 内部任何类；MavenManifestParser；CLI 入口 | 扩展只能依赖 spi，编译期阻断越界 |
-| C（Maven + CLI） | npm 扩展任何文件；ScanEngine/PolicyEngine/ReportRenderer | core 的业务逻辑由 A 负责，C 负责解析器和入口 |
+| A（核心架构） | npm / Go 扩展任何文件；扩展的契约测试 | 独立扩展必须由组内另一位成员从零实现，A 未参与编写才能证明扩展接口"足以支持他人使用" |
+| B（npm / Go 扩展） | core 内部任何类；MavenManifestParser；CLI 入口 | 扩展只能依赖 spi，编译期阻断越界 |
+| C（Maven + CLI） | npm / Go 扩展任何文件；ScanEngine/PolicyEngine/ReportRenderer | core 的业务逻辑由 A 负责，C 负责解析器和入口 |
 
 ### 5.2 禁止事项
 
@@ -219,12 +223,12 @@ spi (P1) ← npm 扩展 (P3)    ← 可以和 core 并行
 | 4 | 先改代码再改 CONTRACT.md | 契约必须先行 | PR 打回重写 |
 | 5 | 手动合并而不经过 PR | 任务书要求"问题描述→分支→PR→Review→合并" | 该提交不算贡献，重走流程 |
 | 6 | 打完 Tag 后改仓库 | SHA-256 会失效 | Tag 需删除重打，额外记录 |
-| 7 | B 修改 npm 扩展以外的任何源码 | 独立扩展的独立性无法验证 | 扩展资格取消，重分模块 |
+| 7 | B 修改 npm / Go 扩展以外的任何源码 | 独立扩展的独立性无法验证 | 扩展资格取消，重分模块 |
 
 ### 5.3 范围边界（写进 README）
 
 ```text
-本次实现：Maven 清单解析、npm 清单解析（扩展）、许可证快照匹配、两种策略、Markdown 报告、CLI 入口、退出码、Checkstyle + CI
+本次实现：Maven 清单解析、npm 清单解析（扩展）、Go 清单解析（扩展）、许可证快照匹配、两种策略、Markdown 报告、CLI 入口、退出码、Checkstyle + CI
 本次不做：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容
 结论声明：许可证快照为课程级数据，结论不构成法律意见
 ```
@@ -242,8 +246,9 @@ mvn -B compile
 # 跑自己模块的测试
 # A 跑 core + cli 测试
 mvn -B test -pl licenselens-core,licenselens-cli
-# B 跑 npm 扩展测试
+# B 跑 npm / Go 扩展测试
 mvn -B test -f plugins/licenselens-npm/pom.xml
+mvn -B test -f plugins/licenselens-go/pom.xml
 # C 跑 cli + Maven 解析器测试
 mvn -B test -pl licenselens-core,licenselens-cli
 
@@ -276,6 +281,7 @@ git rev-list -n 1 v0.1.0      # Tag 必须指向 HEAD
 java -jar ... scan --manifest samples/demo-maven/pom.xml
 java -jar ... scan --manifest samples/demo-maven/pom.xml --policy permissive-only
 java -jar ... scan --manifest samples/demo-npm/package-lock.json --plugins plugins
+java -jar ... scan --manifest samples/demo-go/go.mod --plugins plugins
 Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 ```
 
@@ -306,7 +312,7 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | 成员 | 主讲内容 | 时长 |
 | --- | --- | --- |
 | A | SPI 契约设计 + ScanEngine 调度逻辑 + 故意改错演示（改排序比较器） | 2 分钟 |
-| B | npm 扩展怎么写 + 怎么证明扩展独立（pom 只依赖 spi + 核心零改动） + 移走扩展报错演示 | 2 分钟 |
+| B | npm / Go 扩展怎么写 + 怎么证明扩展独立（pom 只依赖 spi + 核心零改动） + 移走扩展报错演示 | 2 分钟 |
 | C | CLI 退出码 + 插件加载（URLClassLoader + ServiceLoader） + 构建/发布流程 + SHA-256 | 2 分钟 |
 
 **每人必须能讲清**：
@@ -321,6 +327,7 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | 日期 | 变更 | 原因 | 审批 |
 | --- | --- | --- | --- |
 | 2026-11-17 | v1.0 初始版本 | Gate 0 契约冻结 | A/B/C 全员签字 |
+| 2026-11-18 | 对齐 Go 扩展的模块归属、测试、门禁与答辩分工；Checkstyle 纳入 verify | 仓库已有 `plugins/licenselens-go`；L08 原件未提供，先按代码风格约束落最小规则集 | 待全员 Review |
 
 ---
 
@@ -332,6 +339,6 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | --- | --- | --- |
 | A | | |
 | B | | |
-| C | | |
+| C | GeneralDXL | 2026-11-17 |
 
 **签字后本文档正式生效。** 任何变更须走 CONTRACT.md 变更流程，三人都同意后才能修改。
