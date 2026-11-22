@@ -86,7 +86,7 @@
 | FR-2 | 识别依赖的许可证与风险等级 | 必须 | 报告列与快照一致 |
 | FR-3 | 按策略给出允许/警告/阻断判定 | 必须 | 两种策略结果不同 |
 | FR-4 | 输出 Markdown 报告文件 | 必须 | 文件存在且内容逐行比对 |
-| FR-5 | 终端摘要与退出码 | 必须 | 4 种退出码分别可复现 |
+| FR-5 | 终端摘要与退出码 | 必须 | 5 种退出码（0/1/2/3/4）分别可复现 |
 | FR-6 | 未知许可证标记为 UNKNOWN 并汇总 | 必须 | 虚构 artifact 用例 |
 | FR-7 | 支持外部解析器插件（目录加载） | 必须 | 放入 npm 插件后生效 |
 | FR-8 | 支持第二种生态（npm） | 必须（扩展） | 扫 package-lock.json 成功 |
@@ -97,7 +97,7 @@
 | 编号 | 需求 | 指标 |
 | --- | --- | --- |
 | NFR-1 | 离线运行 | 全程无网络请求 |
-| NFR-2 | 确定性 | 同一输入两次输出完全一致 |
+| NFR-2 | 确定性 | 同一输入两次排序一致；报告含生成时间，字节不完全一致 |
 | NFR-3 | 性能 | 200 条依赖扫描 < 2 秒 |
 | NFR-4 | 环境 | JDK 21，命令行可运行，不依赖 IDE |
 | NFR-5 | 可诊断 | 错误含文件路径；解析错误含行号 |
@@ -106,7 +106,7 @@
 ### 3.3 范围边界（写进 README）
 
 ```text
-本次实现：Maven 清单解析、许可证快照匹配、两种策略、Markdown 报告、npm 扩展
+本次实现：Maven 清单解析、许可证快照匹配、两种策略、Markdown 报告、npm 扩展（已合入）、Go 扩展（已合入）
 本次不做：传递依赖、联网查询、SBOM 导出、源码扫描、GUI、插件市场、热加载
 ```
 
@@ -163,12 +163,16 @@ licenselens/
 ├─ licenselens-core/            # 核心实现 + Maven 解析器 + licenses.json
 ├─ licenselens-cli/             # 入口，打可执行 jar
 ├─ plugins/
-│  └─ licenselens-npm/          # 独立扩展，不属于 parent reactor
+│  ├─ licenselens-npm/          # 独立扩展：v1/v2/v3 已实现，不属于 parent reactor
+│  └─ licenselens-go/           # 独立扩展：go.mod 解析已实现，不属于 parent reactor
 ├─ samples/
 │  ├─ demo-maven/pom.xml
 │  ├─ demo-npm/package-lock.json
+│  ├─ demo-npm/package-lock.v1.json
+│  ├─ demo-npm/package-lock.v2.json
+│  ├─ demo-go/go.mod
 │  ├─ edge/empty.xml
-│  └─ expected/report.md
+│  └─ edge/bad-lock.json
 ├─ docs/
 │  ├─ CONTRACT.md
 │  └─ DESIGN.docx
@@ -227,7 +231,7 @@ public final class SourceException extends Exception {
 
 - 扩展在 `META-INF/services/edu.course.licenselens.spi.DependencySource` 中声明实现类；
 - CLI 启动时用独立 `URLClassLoader` 加载 `--plugins` 目录下所有 jar，再 `ServiceLoader.load(DependencySource.class, loader)`；
-- 选择顺序：按 `id()` 字典序，取第一个 `supports()` 返回 true 的解析器；
+- 选择顺序：按注入顺序取第一个 `supports()` 返回 true 的解析器（内置 Maven 在前，插件按目录项顺序）；冻结契约仍写 `id()` 字典序，待按变更流程对齐；
 - 无法识别的 jar 跳过并告警，不中断扫描。
 
 ### 6.3 错误契约（写入 CONTRACT.md 并被测试覆盖）
@@ -237,7 +241,7 @@ public final class SourceException extends Exception {
 | 文件不存在 | `FILE_NOT_FOUND` | 打印路径，终止 | 2 |
 | XML/JSON 语法错误 | `PARSE_ERROR`（含行号） | 打印行号，终止 | 3 |
 | 无解析器支持该文件 | 无 | 提示安装插件 | 4 |
-| 插件类加载失败 | 运行时异常 | 记录插件名，跳过该插件 | 0（继续） |
+| 插件类加载失败 | 运行时异常 | 记录插件名，跳过该插件 | 继续；若因此无可用解析器仍为 4 |
 | 依赖未命中快照 | 无 | 标记 UNKNOWN，计入汇总 | 0 |
 
 ### 6.4 兼容策略
@@ -278,7 +282,7 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
   CLI 校验路径失败 → 打印 "清单文件不存在: <路径>" → 退出码 2
 
 分支 B：XML 语法错误
-  解析器抛 PARSE_ERROR(line=12) → 打印 "第 12 行附近格式错误" → 退出码 3
+  解析器抛 PARSE_ERROR(line=15) → 打印 "第 15 行附近格式错误" → 退出码 3
 
 分支 C：没有可用解析器
   所有 supports() 返回 false → 打印 "未找到可解析该文件的插件，请安装 npm 解析器" → 退出码 4
@@ -294,7 +298,7 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 | 插件发现 | 必须使用独立类加载器，避免污染应用 classpath |
 | 解析 | 解析器只负责"文件 → 依赖列表"，不做许可证判断 |
 | 匹配 | 匹配逻辑只在 core，确保不同生态结论一致 |
-| 渲染 | 排序稳定，保证同一输入输出字节一致 |
+| 渲染 | 排序稳定，保证同一输入输出排序一致；报告含生成时间，字节不完全一致 |
 
 ---
 
@@ -305,6 +309,11 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 ```json
 {
   "org.apache.commons:commons-lang3": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "com.google.guava:guava": {
     "spdxId": "Apache-2.0",
     "name": "Apache License 2.0",
     "risk": "PERMISSIVE"
@@ -406,13 +415,13 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 | --- | --- | --- | --- | --- |
 | T1 | 正常 | `samples/demo-maven/pom.xml` | 报告 4 行；顺序为 GPL → EPL → Apache | 主流程 + 排序 |
 | T2 | 正常 | 同上 + `--policy permissive-only` | EPL 行判定为阻断，退出码 1 | 策略差异 |
-| T3 | 边界 | `samples/edge/empty.xml`（无 dependencies） | 0 行，退出码 0，摘要含"无依赖" | 空输入 |
+| T3 | 边界 | `samples/edge/empty.xml`（无 dependencies） | 0 行，退出码 0，摘要显示“依赖数: 0” | 空输入 |
 | T4 | 边界 | 依赖名含 `$` 占位符 | 保留原样并标记 UNKNOWN | 非预期输入 |
 | T5 | 失败 | 不存在的路径 | 退出码 2，提示含路径 | 错误反馈 |
-| T6 | 失败 | 第 12 行损坏的 XML | 退出码 3，提示含行号 | 错误定位 |
-| T7 | 扩展 | 放入 npm 插件，扫 `package-lock.json` | 报告含 `ecosystem=npm` 行且版本正确 | 扩展接入 |
+| T6 | 失败 | 损坏的 XML（`samples/edge/bad-pom.xml`） | 退出码 3，提示含行号（实测第 15 行附近） | 错误定位 |
+| T7 | 扩展 | 放入已构建的 npm 插件 jar，扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；CLI 级集成用例待补 | 扩展接入（计划） |
 | T8 | 扩展 | 移走 npm 插件后扫同一文件 | 退出码 4，提示安装插件 | 降级行为 |
-| T9 | 扩展 | 插件契约测试（不依赖 core） | 解析结果字段正确 | 契约稳定性 |
+| T9 | 扩展 | npm 39 例 + Go 40 例（不依赖 core） | 解析结果字段、错误码与发现规则正确 | 契约稳定性（两个扩展均已覆盖） |
 
 ### 10.2 故意改错演示
 
@@ -472,7 +481,7 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 | 版本 | 0.1.0（首个可用版本） |
 | 制品 | `licenselens-0.1.0.zip`：cli jar + npm 插件 jar + samples + 启动脚本 |
 | 环境 | JDK 21，无需 IDE |
-| 运行 | `java -jar licenselens-cli-0.1.0.jar scan --manifest samples/demo-maven/pom.xml` |
+| 运行 | `java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-maven/pom.xml`（发布版以 `RELEASE.md` 中记录的产物名为准） |
 
 ### 12.2 发布步骤
 
@@ -532,9 +541,9 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | --- | --- | --- |
 | 1 | `licenselens scan --manifest samples/demo-maven/pom.xml` | 展示 4 行报告与风险排序 |
 | 2 | 加 `--policy permissive-only` | 同一输入判定变化，退出码 1 |
-| 3 | 放入 npm 插件后扫 `package-lock.json` | 新生态生效，核心零改动 |
+| 3 | 先构建 npm 插件 jar 放入 `plugins/`，再扫 `package-lock.json` | 新生态生效，核心零改动 |
 | 4 | 移走插件后重跑 | 退出码 4，提示安装解析器 |
-| 5 | 给一个坏 JSON | 退出码 3，指出行号 |
+| 5 | 把 `samples/edge/bad-lock.json` 复制为 `package-lock.json` 后扫描 | 退出码 3，提示第 8 行附近；原名返回 4 |
 | 6 | 改一行排序代码 → 测试红 → 恢复 → 绿 | 证明测试有效 |
 
 ---
@@ -543,16 +552,16 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 
 | 问题 | 回答要点 |
 | --- | --- |
-| 许可证数据准确吗？ | 课程级快照 40 条常见依赖；未知一律 UNKNOWN；README 声明非法律意见；快照可替换 |
+| 许可证数据准确吗？ | 课程级快照当前 4 条 Maven 坐标（规划 40 条未达成）；未知一律 UNKNOWN；README 声明非法律意见；快照可替换 |
 | 这跟依赖检查工具有什么区别？ | 统一模型 + 可插拔生态适配；新增生态只写一个类，核心零改动 |
 | 为什么不做传递依赖？ | 需要依赖树与版本仲裁，超出课程范围；明确声明限制优于不准确 |
 | 怎么证明扩展独立？ | 扩展 pom 只依赖 spi；开发期间作者未读 core；`git log` 显示接入无核心提交 |
-| 插件失败会怎样？ | 加载失败跳过并告警；无解析器退出码 4；单文件解析失败退出码 3，不影响其他文件 |
+| 插件失败会怎样？ | 加载失败跳过并告警；若因此无可用解析器仍返回 4；清单语法错误返回 3 |
 | 为什么用独立类加载器？ | 避免插件依赖污染宿主 classpath，支持插件单独替换 |
 | 契约变更怎么处理？ | 记录在 CONTRACT.md，新增默认方法兼容；字段变更升主版本并公告 |
-| 报告为什么排序？ | 保证同一输入输出一致，便于测试与 diff |
+| 报告为什么排序？ | 保证同一输入输出排序一致，便于测试与 diff；报告含生成时间，字节不完全一致 |
 | 覆盖率多少？ | 不追求数字；以三类行为的断言覆盖为准，故意改错能被测试发现 |
-| 你们的已知限制？ | 声明层、离线快照、仅两种生态、无 SBOM、非法律意见 |
+| 你们的已知限制？ | 声明层、离线快照（4 条 Maven 坐标）、两个扩展都需构建 jar 才能被 CLI 发现、T7 集成测试待补、无 SBOM、非法律意见 |
 
 ---
 
