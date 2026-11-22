@@ -11,44 +11,31 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * 独立扩展：Go go.mod 解析器。
+ * 解析 Go 模块清单 go.mod 的独立扩展。
  * <p>
- * 与 npm 插件一样和 core 完全解耦——只依赖 {@code licenselens-spi}。
- * 这是第二个独立扩展，用来验证“核心源码不变即可接入新生态”。
+ * 本插件仅依赖 {@code licenselens-spi}，不引用 core 或 cli。
  *
  * <h3>支持的语法子集</h3>
  * <ul>
- *   <li>首行 {@code module <模块路径>}（允许 BOM、前导空白与行尾注释）；</li>
- *   <li>块式依赖 {@code require ( ... )}，含单行 {@code require <path> <version>}；</li>
- *   <li>{@code // indirect} 映射为 scope = "indirect"，其余为 "runtime"；</li>
- *   <li>{@code replace} / {@code exclude} / {@code retract} / {@code go} / {@code toolchain} 等指令忽略；</li>
- *   <li>主版本后缀（如 {@code /v8}）与伪版本字符串原样保留。</li>
+ *   <li>首行 {@code module <模块路径>}，允许 BOM、前导空白与行尾注释；</li>
+ *   <li>块式 {@code require ( ... )} 与单行 {@code require <path> <version>}；</li>
+ *   <li>{@code // indirect} 映射为 {@code scope = "indirect"}，其余为 {@code "runtime"}；</li>
+ *   <li>{@code replace} / {@code exclude} / {@code retract} / {@code go} / {@code toolchain} 指令忽略；</li>
+ *   <li>主版本后缀与伪版本字符串原样保留。</li>
  * </ul>
  *
- * <h3>字段填充约定（CONTRACT.md 1.3）</h3>
+ * <h3>字段与边界</h3>
  * <ul>
- *   <li>ecosystem = "go"；</li>
- *   <li>name = module path；</li>
- *   <li>version = require 行中的版本字符串；</li>
- *   <li>scope = "runtime" 或 "indirect"。</li>
+ *   <li>字段填充见 docs/CONTRACT.md 1.3：ecosystem = "go"，name = module path；</li>
+ *   <li>按 require 声明顺序返回，不排序；空 require 块返回空列表；</li>
+ *   <li>重复模块路径、缺字段、未闭合块、游离右括号均为 PARSE_ERROR，行号指向问题行。</li>
  * </ul>
- *
- * <h3>边界</h3>
- * <ul>
- *   <li>按 require 声明顺序返回，不排序；</li>
- *   <li>空 require 块返回空 List，不返回 null；</li>
- *   <li>重复的 module path、缺字段、未闭合块、游离右括号均按 PARSE_ERROR 处理，
- *       行号尽量指向问题行；未闭合块指向块起始行。</li>
- * </ul>
- *
- * <h3>依赖方向铁律</h3>
- * 本插件 pom 里**只有** {@code licenselens-spi} 依赖，不得出现 core。
  */
 public class GoModManifestParser implements DependencySource {
 
@@ -62,6 +49,12 @@ public class GoModManifestParser implements DependencySource {
         return GO;
     }
 
+    /**
+     * 仅接受文件名为 go.mod 且首行包含 module 指令的清单。
+     *
+     * @param ref 清单引用，允许为 null
+     * @return 是否能解析该清单
+     */
     @Override
     public boolean supports(ManifestRef ref) {
         if (ref == null || ref.fileName() == null || ref.firstLine() == null) {
@@ -70,7 +63,7 @@ public class GoModManifestParser implements DependencySource {
         if (!"go.mod".equalsIgnoreCase(ref.fileName())) {
             return false;
         }
-        // CONTRACT 1.1：supports 同时看文件名与首行特征，避免同名文件误判。
+        // CONTRACT 1.1 要求同时判断文件名与首行特征，避免同名文件误判。
         String first = stripBom(ref.firstLine()).stripLeading();
         if (!first.startsWith("module")) {
             return false;
@@ -81,6 +74,13 @@ public class GoModManifestParser implements DependencySource {
                 && !first.substring(rest).strip().isEmpty();
     }
 
+    /**
+     * 解析 go.mod 中的 require 声明。
+     *
+     * @param file 清单路径，不能为 null，且必须是普通文件
+     * @return 按声明顺序排列的依赖列表；无 require 时返回空列表
+     * @throws SourceException 路径无效时为 FILE_NOT_FOUND，语法问题为 PARSE_ERROR 并带行号
+     */
     @Override
     public List<Dependency> parse(Path file) throws SourceException {
         if (file == null) {
@@ -91,88 +91,13 @@ public class GoModManifestParser implements DependencySource {
                     "清单文件不存在或不是普通文件: " + file);
         }
 
-        String text = read(file);
-        String[] lines = text.split("\\R", -1);
-        List<Dependency> result = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        int requireBlockStart = -1;
-        int ignoredBlockStart = -1;
-        boolean sawModule = false;
-
+        String[] lines = read(file).split("\\R", -1);
+        ParseState state = new ParseState();
         for (int i = 0; i < lines.length; i++) {
-            int lineNo = i + 1;
-            String raw = i == 0 ? stripBom(lines[i]) : lines[i];
-            String code = stripComment(raw).strip();
-            if (code.isEmpty()) {
-                continue;
-            }
-
-            if (ignoredBlockStart > 0) {
-                if (")".equals(code)) {
-                    ignoredBlockStart = -1;
-                }
-                continue;
-            }
-
-            if (requireBlockStart > 0) {
-                if (")".equals(code)) {
-                    requireBlockStart = -1;
-                    continue;
-                }
-                String[] tokens = code.split("\\s+");
-                if ("require".equals(tokens[0])) {
-                    throw new SourceException(SourceException.Code.PARSE_ERROR,
-                            "require 块内不允许再写 require 指令", lineNo);
-                }
-                addDependency(result, seen, requireEntry(tokens, 0, raw, lineNo), lineNo);
-                continue;
-            }
-
-            String[] tokens = code.split("\\s+");
-            if ("module".equals(tokens[0])) {
-                if (tokens.length != 2) {
-                    throw new SourceException(SourceException.Code.PARSE_ERROR,
-                            "module 指令必须恰好指定一个模块路径", lineNo);
-                }
-                sawModule = true;
-                continue;
-            }
-            if ("require".equals(tokens[0])) {
-                if (tokens.length == 2 && "(".equals(tokens[1])) {
-                    requireBlockStart = lineNo;
-                    continue;
-                }
-                if (tokens.length == 2 && "()".equals(tokens[1])) {
-                    continue;
-                }
-                addDependency(result, seen, requireEntry(tokens, 1, raw, lineNo), lineNo);
-                continue;
-            }
-            if (tokens.length == 2 && "(".equals(tokens[1])) {
-                // replace / exclude / retract 等块与本插件无关，整块跳过。
-                ignoredBlockStart = lineNo;
-                continue;
-            }
-            if (")".equals(code)) {
-                throw new SourceException(SourceException.Code.PARSE_ERROR,
-                        "游离的右括号", lineNo);
-            }
-            // go / toolchain / exclude 单行 / replace 单行 / retract 单行等指令均忽略。
+            consumeLine(lines[i], i + 1, state);
         }
-
-        if (requireBlockStart > 0) {
-            throw new SourceException(SourceException.Code.PARSE_ERROR,
-                    "require 块未闭合", requireBlockStart);
-        }
-        if (ignoredBlockStart > 0) {
-            throw new SourceException(SourceException.Code.PARSE_ERROR,
-                    "指令块未闭合", ignoredBlockStart);
-        }
-        if (!sawModule) {
-            throw new SourceException(SourceException.Code.PARSE_ERROR,
-                    "go.mod 缺少 module 指令", 1);
-        }
-        return result;
+        verifyComplete(state);
+        return List.copyOf(state.dependencies);
     }
 
     private static String read(Path file) throws SourceException {
@@ -184,6 +109,96 @@ public class GoModManifestParser implements DependencySource {
         } catch (IOException e) {
             throw new SourceException(SourceException.Code.PARSE_ERROR,
                     "读取清单失败: " + e.getMessage(), 1);
+        }
+    }
+
+    private static void consumeLine(String rawLine, int lineNo, ParseState state)
+            throws SourceException {
+        String raw = lineNo == 1 ? stripBom(rawLine) : rawLine;
+        String code = stripComment(raw).strip();
+        if (code.isEmpty()) {
+            return;
+        }
+        if (state.ignoredBlockStart > 0) {
+            if (")".equals(code)) {
+                state.ignoredBlockStart = -1;
+            }
+            return;
+        }
+        if (state.requireBlockStart > 0) {
+            consumeRequireBlockLine(code, raw, lineNo, state);
+            return;
+        }
+        consumeDirective(code, raw, lineNo, state);
+    }
+
+    private static void consumeRequireBlockLine(String code, String raw, int lineNo, ParseState state)
+            throws SourceException {
+        if (")".equals(code)) {
+            state.requireBlockStart = -1;
+            return;
+        }
+        String[] tokens = code.split("\\s+");
+        if ("require".equals(tokens[0])) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "require 块内不允许再写 require 指令", lineNo);
+        }
+        addDependency(state, requireEntry(tokens, 0, raw, lineNo), lineNo);
+    }
+
+    private static void consumeDirective(String code, String raw, int lineNo, ParseState state)
+            throws SourceException {
+        String[] tokens = code.split("\\s+");
+        if ("module".equals(tokens[0])) {
+            requireModulePath(tokens, lineNo);
+            state.sawModule = true;
+            return;
+        }
+        if ("require".equals(tokens[0])) {
+            consumeRequireDirective(tokens, raw, lineNo, state);
+            return;
+        }
+        if (tokens.length == 2 && "(".equals(tokens[1])) {
+            // replace / exclude / retract 等块与本插件无关，整块跳过。
+            state.ignoredBlockStart = lineNo;
+            return;
+        }
+        if (")".equals(code)) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR, "游离的右括号", lineNo);
+        }
+        // go / toolchain / 单行 replace / 单行 exclude 等指令均忽略。
+    }
+
+    private static void requireModulePath(String[] tokens, int lineNo) throws SourceException {
+        if (tokens.length != 2) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "module 指令必须恰好指定一个模块路径", lineNo);
+        }
+    }
+
+    private static void consumeRequireDirective(String[] tokens, String raw, int lineNo,
+                                                ParseState state) throws SourceException {
+        if (tokens.length == 2 && "(".equals(tokens[1])) {
+            state.requireBlockStart = lineNo;
+            return;
+        }
+        if (tokens.length == 2 && "()".equals(tokens[1])) {
+            return;
+        }
+        addDependency(state, requireEntry(tokens, 1, raw, lineNo), lineNo);
+    }
+
+    private static void verifyComplete(ParseState state) throws SourceException {
+        if (state.requireBlockStart > 0) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "require 块未闭合", state.requireBlockStart);
+        }
+        if (state.ignoredBlockStart > 0) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "指令块未闭合", state.ignoredBlockStart);
+        }
+        if (!state.sawModule) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR, "go.mod 缺少 module 指令", 1);
         }
     }
 
@@ -201,13 +216,13 @@ public class GoModManifestParser implements DependencySource {
         return new Dependency(GO, tokens[offset], tokens[offset + 1], scope);
     }
 
-    private static void addDependency(List<Dependency> result, Set<String> seen,
-                                      Dependency dep, int line) throws SourceException {
-        if (!seen.add(dep.name())) {
+    private static void addDependency(ParseState state, Dependency dep, int line)
+            throws SourceException {
+        if (!state.seenModules.add(dep.name())) {
             throw new SourceException(SourceException.Code.PARSE_ERROR,
                     "重复的 require 模块: " + dep.name(), line);
         }
-        result.add(dep);
+        state.dependencies.add(dep);
     }
 
     private static boolean hasIndirectComment(String raw) {
@@ -225,5 +240,13 @@ public class GoModManifestParser implements DependencySource {
 
     private static String stripBom(String text) {
         return !text.isEmpty() && text.charAt(0) == '\uFEFF' ? text.substring(1) : text;
+    }
+
+    private static final class ParseState {
+        private final List<Dependency> dependencies = new ArrayList<>();
+        private final Set<String> seenModules = new LinkedHashSet<>();
+        private int requireBlockStart = -1;
+        private int ignoredBlockStart = -1;
+        private boolean sawModule;
     }
 }
