@@ -45,18 +45,27 @@ public class PluginLoader {
         for (File jar : jars) {
             try {
                 URL url = jar.toURI().toURL();
-                try (URLClassLoader loader = new URLClassLoader(new URL[]{url},
-                        PluginLoader.class.getClassLoader())) {
-                    ServiceLoader<DependencySource> sl =
-                            ServiceLoader.load(DependencySource.class, loader);
-                    Iterator<DependencySource> it = sl.iterator();
-                    while (it.hasNext()) {
-                        try {
-                            sources.add(it.next());
-                        } catch (Throwable t) {
-                            System.err.println("WARN: 插件 " + jar.getName()
-                                    + " 加载失败（已跳过）: " + t.getMessage());
-                        }
+                URLClassLoader loader = new URLClassLoader(new URL[]{url},
+                        PluginLoader.class.getClassLoader());
+                final URLClassLoader toClose = loader;
+                // 插件类在 parse() 时才首次加载，不能在 loadAll() 内提前关闭 loader，
+                // 否则抛出 NoClassDefFoundError。改为 JVM 退出时统一关闭。
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    try {
+                        toClose.close();
+                    } catch (Exception e) {
+                        System.err.println("WARN: 关闭插件加载器失败: " + e.getMessage());
+                    }
+                }, "plugin-loader-close"));
+                ServiceLoader<DependencySource> sl =
+                        ServiceLoader.load(DependencySource.class, loader);
+                Iterator<DependencySource> it = sl.iterator();
+                while (it.hasNext()) {
+                    try {
+                        sources.add(it.next());
+                    } catch (Throwable t) {
+                        System.err.println("WARN: 插件 " + jar.getName()
+                                + " 加载失败（已跳过）: " + t.getMessage());
                     }
                 }
             } catch (Throwable t) {

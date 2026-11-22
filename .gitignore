@@ -38,3 +38,6 @@ reports/
 # Test
 coverage/
 *.exec
+
+# logs or temp files
+output/

@@ -1,0 +1,54 @@
+# 插件分支专用 CI：只验证 npm 扩展，不依赖 core / cli 的完成度。
+# 主 CI（ci.yml）由 C 负责，仅在 main/master 触发；本文件不改动它。
+name: npm Plugin CI
+
+on:
+  push:
+    branches: ['feat/npm-parser']
+  pull_request:
+    branches: ['feat/npm-parser']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-plugin-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # npm 插件是独立 reactor，先安装 parent 与 spi 到本地仓库。
+      # 用 working-directory 而非 cd && ...，保证 Ubuntu / PowerShell 通用。
+      - name: Install parent + SPI
+        run: |
+          mvn -B -N install -DskipTests
+          mvn -B -pl licenselens-spi install -DskipTests
+
+      - name: Verify npm plugin (39 contract tests)
+        working-directory: plugins/licenselens-npm
+        run: mvn -B clean verify
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-plugin-reports-${{ matrix.os }}
+          path: plugins/licenselens-npm/target/surefire-reports/**
+          if-no-files-found: ignore
