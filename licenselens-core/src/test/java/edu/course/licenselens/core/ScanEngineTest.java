@@ -1,7 +1,9 @@
 package edu.course.licenselens.core;
 
 import edu.course.licenselens.core.internal.MavenManifestParser;
+import edu.course.licenselens.spi.Dependency;
 import edu.course.licenselens.spi.DependencySource;
+import edu.course.licenselens.spi.ManifestRef;
 import edu.course.licenselens.spi.Policy;
 import edu.course.licenselens.spi.SourceException;
 
@@ -111,6 +113,20 @@ class ScanEngineTest {
                 "占位符名称应原样出现在报告里");
     }
 
+    @Test
+    @DisplayName("契约 §四：多个解析器都支持时按 id() 字典序选中，而非注入顺序")
+    void shouldSelectSourceByIdOrderNotInjectionOrder() throws SourceException {
+        ScanEngine orderEngine = new ScanEngine(new LicenseCatalog(),
+                List.of(new StubSource("z-stub"), new StubSource("a-stub")),
+                List.of(new CampusPolicy()));
+
+        ScanResult result = orderEngine.scan(sample("demo-maven/pom.xml"), "campus");
+
+        assertEquals(1, result.totalCount());
+        assertTrue(result.reportContent().contains("stub:a-stub"),
+                "应按 id() 字典序选中 a-stub，而不是先注入的 z-stub");
+    }
+
     private static Path sample(String relative) {
         return repoRoot().resolve("samples").resolve(relative);
     }
@@ -124,5 +140,30 @@ class ScanEngineTest {
             throw new IllegalStateException("找不到 samples/，测试需在仓库内运行");
         }
         return dir;
+    }
+
+    /** 测试替身：认领一切清单，返回一条以自身 id 命名的依赖，用于观察实际选中的解析器。 */
+    private static final class StubSource implements DependencySource {
+
+        private final String id;
+
+        StubSource(String id) {
+            this.id = id;
+        }
+
+        @Override
+        public String id() {
+            return id;
+        }
+
+        @Override
+        public boolean supports(ManifestRef ref) {
+            return true;
+        }
+
+        @Override
+        public List<Dependency> parse(Path file) {
+            return List.of(new Dependency("stub", "stub:" + id, "1.0", "compile"));
+        }
     }
 }
