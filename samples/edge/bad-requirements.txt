@@ -1,0 +1,3 @@
+# edge：requirements.txt 格式错误样例（第 3 行不是合法的依赖声明）
+requests==2.31.0
+this is not a requirement
