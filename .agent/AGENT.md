@@ -38,7 +38,7 @@ LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单�
 
 - **契约 v1 已冻结**：接口签名、退出码表、错误契约、兼容策略均已定稿。需要变更时先改 `docs/CONTRACT.md`，再改代码。
 - **退出码**：`0` 正常 / `1` 存在阻断依赖 / `2` 清单文件不存在 / `3` 清单语法错误 / `4` 无可用解析器。插件 jar 加载失败属降级：告警后跳过，不中断扫描。
-- **注册与选择**：内置 Maven 解析器由构造注入，不走 ServiceLoader；外部插件靠 jar 内 `META-INF/services/edu.course.licenselens.spi.DependencySource` 声明，当前按注入顺序（内置 Maven 在前，插件按目录项顺序）取第一个 `supports()` 为 true 的解析器；冻结契约仍写 `id()` 字典序，待按变更流程对齐。
+- **注册与选择**：内置 Maven 解析器由构造注入，不走 ServiceLoader；外部插件靠 jar 内 `META-INF/services/edu.course.licenselens.spi.DependencySource` 声明，按 `id()` 字典序取第一个 `supports()` 为 true 的解析器（内置 Maven 的 id 为 `maven`）。
 - **确定性输出**：报告排序固定为风险降序，同风险等级内按名称升序；风险序为 `STRONG_COPYLEFT` → `WEAK_COPYLEFT` → `PERMISSIVE` → `UNKNOWN`（**不是** `RiskLevel` 的声明顺序，别直接用 `ordinal()`）。同一输入排序一致；报告含生成时间，字节不完全一致。
 - **许可证快照**：`licenses.json` 按 `groupId:artifactId` 精确匹配，当前仅 4 条 Maven 坐标（规划约 40 条未达成）；未命中时返回 `UNKNOWN` 占位，不得猜测许可证。
 - **范围边界（本次不做）**：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容。许可证结论为课程级判断，不构成法律意见。
