@@ -26,7 +26,7 @@ public class LicenseCatalog {
     }
 
     /**
-     * 根据依赖名查许可证。
+     * 根据依赖名查许可证（向后兼容的纯名称查找）。
      *
      * @param depName 依赖名（Maven groupId:artifactId，npm 包名）
      * @return 匹配到的 LicenseInfo；未命中返回 UNKNOWN 占位
@@ -35,6 +35,23 @@ public class LicenseCatalog {
         LicenseInfo info = entries.get(depName);
         if (info != null) return info;
         return new LicenseInfo(null, "未知许可证", RiskLevel.UNKNOWN);
+    }
+
+    /**
+     * 跨生态许可证查找（Issue #11）。
+     * <p>
+     * 匹配顺序：
+     * <ol>
+     *   <li>先按 {@code ecosystem:name} 精确命中（如 {@code npm:lodash}、{@code python:requests}）</li>
+     *   <li>未命中再按纯 {@code name} 回退（向后兼容 Maven 坐标）</li>
+     *   <li>都没命中 → UNKNOWN</li>
+     * </ol>
+     */
+    public LicenseInfo lookup(Dependency dep) {
+        String keyed = dep.ecosystem() + ":" + dep.name();
+        LicenseInfo info = entries.get(keyed);
+        if (info != null) return info;
+        return lookup(dep.name());
     }
 
     Map<String, LicenseInfo> getEntries() {

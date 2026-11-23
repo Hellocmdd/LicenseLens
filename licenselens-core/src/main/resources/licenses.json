@@ -209,5 +209,80 @@
     "spdxId": "BSD-3-Clause",
     "name": "BSD 3-Clause License",
     "risk": "PERMISSIVE"
+  },
+
+  "npm:lodash": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE",
+    "note": "https://registry.npmjs.org/lodash 确认 MIT"
+  },
+  "npm:express": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE"
+  },
+  "npm:react": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE"
+  },
+  "npm:axios": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE"
+  },
+  "npm:chalk": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE"
+  },
+
+  "python:requests": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE",
+    "note": "https://pypi.org/project/requests/ 确认 Apache-2.0"
+  },
+  "python:flask": {
+    "spdxId": "BSD-3-Clause",
+    "name": "BSD 3-Clause License",
+    "risk": "PERMISSIVE",
+    "note": "Flask/Werkzeug BSD-3-Clause"
+  },
+  "python:numpy": {
+    "spdxId": "BSD-3-Clause",
+    "name": "BSD 3-Clause License",
+    "risk": "PERMISSIVE",
+    "note": "NumPy BSD-3-Clause"
+  },
+  "python:pandas": {
+    "spdxId": "BSD-3-Clause",
+    "name": "BSD 3-Clause License",
+    "risk": "PERMISSIVE"
+  },
+
+  "go:github.com/go-redis/redis": {
+    "spdxId": "BSD-2-Clause",
+    "name": "BSD 2-Clause License",
+    "risk": "PERMISSIVE",
+    "note": "https://github.com/redis/go-redis 确认 BSD-2-Clause"
+  },
+  "go:github.com/google/uuid": {
+    "spdxId": "BSD-3-Clause",
+    "name": "BSD 3-Clause License",
+    "risk": "PERMISSIVE",
+    "note": "https://github.com/google/uuid 确认 BSD-3-Clause"
+  },
+  "go:github.com/stretchr/testify": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE",
+    "note": "https://github.com/stretchr/testify 确认 MIT"
+  },
+  "go:gopkg.in/yaml.v3": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE"
   }
 }
