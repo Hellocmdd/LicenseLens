@@ -12,6 +12,8 @@ import edu.course.licenselens.spi.SourceException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -21,7 +23,7 @@ import java.util.List;
  * <ol>
  *   <li>校验文件路径</li>
  *   <li>读取首行（用于 supports 判断）</li>
- *   <li>按 supports() 选择 DependencySource</li>
+ *   <li>按 id() 字典序选择 DependencySource（契约 §四）</li>
  *   <li>调用 parser.parse() 拿到 List&lt;Dependency&gt;</li>
  *   <li>逐条查 LicenseCatalog → LicenseInfo</li>
  *   <li>调用 Policy.evaluate() → Decision</li>
@@ -69,8 +71,12 @@ public class ScanEngine {
         ManifestRef ref = new ManifestRef(manifest, fileName, firstLine);
 
         // 3. 选择 DependencySource
+        //    契约 §四：按 id() 字典序取第一个 supports() 为 true 的解析器。
+        //    List.sort 是稳定排序，同 id 时保持注入顺序，结果仍然确定。
+        List<DependencySource> ordered = new ArrayList<>(sources);
+        ordered.sort(Comparator.comparing(DependencySource::id));
         DependencySource selected = null;
-        for (DependencySource src : sources) {
+        for (DependencySource src : ordered) {
             try {
                 if (src.supports(ref)) {
                     selected = src;
@@ -96,7 +102,7 @@ public class ScanEngine {
 
         // 6. 逐条匹配许可证 + 策略判定
         ReportRenderer renderer = new ReportRenderer();
-        List<ReportRenderer.ScanRow> rows = new java.util.ArrayList<>();
+        List<ReportRenderer.ScanRow> rows = new ArrayList<>();
         int blockedCount = 0;
         int unknownCount = 0;
 
