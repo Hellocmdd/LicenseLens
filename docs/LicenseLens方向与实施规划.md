@@ -189,8 +189,10 @@ licenselens/
 ├─ licenselens-core/            # 核心实现 + Maven 解析器 + licenses.json
 ├─ licenselens-cli/             # 入口，打可执行 jar
 ├─ plugins/
-│  ├─ licenselens-npm/          # 独立扩展：v1/v2/v3 已实现，不属于 parent reactor
-│  └─ licenselens-go/           # 独立扩展：go.mod 解析已实现，不属于 parent reactor
+│  ├─ licenselens-npm/          # 独立扩展：v1/v2/v3 已实现，随根 reactor 构建
+│  ├─ licenselens-go/           # 独立扩展：go.mod 解析已实现，随根 reactor 构建
+│  └─ licenselens-python/       # 独立扩展：requirements.txt 解析已实现，随根 reactor 构建
+├─ distribution/                # 统一装配 CLI 与插件 jar 到 target/dist/
 ├─ samples/
 │  ├─ demo-maven/pom.xml
 │  ├─ demo-npm/package-lock.json
@@ -235,9 +237,9 @@ licenselens/
 
 ### Gate 3：扩展接入（Day 4-5）
 
-- npm 与 Go 插件均已实现并合入 `master`，分别通过 39 / 40 个契约测试
-- 先独立构建插件 jar，再放入 plugins/ 目录后 CLI 自动发现
-- 移除插件后扫同一文件 → 退出码 4，提示安装
+- npm、Go 与 Python 插件均已实现，分别通过 39 / 40 / 31 个契约测试
+- `mvn -B clean verify` 由 `distribution` 模块统一装配 CLI 与插件 jar 到 `distribution/target/dist/`，CLI 自动发现
+- 单独构建插件时仍可手动放入/移走 jar；移走全部插件后扫同一文件 → 退出码 4，提示安装
 
 ### Gate 4：故意改错演示（Day 6）
 
@@ -270,11 +272,11 @@ licenselens/
 | --- | --- | --- |
 | P0 | Gate 0：契约冻结 | CONTRACT.md 全组签字，任何代码不得开始 |
 | P1 | 骨架搭建 | parent pom + 三模块 + npm 空插件 + Checkstyle + CI；`mvn -B compile` 全过 |
-| P2 | 核心功能 | Maven 解析 + 扫描引擎 + 策略引擎 + 报告渲染；demo-maven 闭环跑通；26 个核心/CLI 测试全绿（扩展另计 npm 39 + Go 40 个） |
-| P3 | 扩展接入 | npm 插件实现 + 契约测试；放入插件生效，移走报错；核心零新增提交 |
+| P2 | 核心功能 | Maven 解析 + 扫描引擎 + 策略引擎 + 报告渲染；demo-maven 闭环跑通；51 个核心/CLI 测试全绿（扩展另计 npm 39 + Go 40 + Python 31 个） |
+| P3 | 扩展接入 | 三类插件实现 + 契约测试；`distribution` 装配后生效，移走报错；核心零新增提交 |
 | P4 | CLI 完善 | 参数解析 + 退出码 + 插件目录加载；四种策略切换验证 |
 | P5 | 故意改错演示 | 排序改升降序 → T1 红 → 恢复 → T1 绿；完整演示一次 |
-| P6 | 质量与发布 | `mvn -B clean verify` 全过；CI 绿色记录；附注 Tag v0.1.0；SHA-256 |
+| P6 | 质量与发布 | `mvn -B clean verify` 全过并产出 `distribution/target/dist/`；CI 绿色记录；附注 Tag v0.1.0；SHA-256 |
 | P7 | 文档 | DESIGN.docx 八章齐全；README 无占位符；RELEASE.md 完整 |
 
 **关键顺序约束**：
@@ -296,9 +298,9 @@ licenselens/
 | T4 | 边界 | 依赖名含 `$` 占位符 | 保留原样并标记 UNKNOWN | 非预期输入 |
 | T5 | 失败 | 不存在的路径 | 退出码 2，提示含路径 | 错误反馈 |
 | T6 | 失败 | 损坏的 XML（`samples/edge/bad-pom.xml`） | 退出码 3，提示含行号（> 0） | 错误定位 |
-| T7 | 扩展 | 放入已构建的 npm 插件 jar，扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；CLI 级集成用例待补 | 扩展接入（计划） |
-| T8 | 扩展 | 移走 npm 插件后扫同一文件 | 退出码 4，提示安装插件 | 降级行为 |
-| T9 | 契约 | npm 39 例 + Go 40 例（不依赖 core） | 解析结果字段、错误码与发现规则正确 | 契约稳定性（两个扩展均已覆盖） |
+| T7 | 扩展 | `distribution` 装配后扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；CLI 级集成用例待补 | 扩展接入（计划） |
+| T8 | 扩展 | 移走插件 jar 后扫同一文件 | 退出码 4，提示安装插件 | 降级行为 |
+| T9 | 契约 | npm 39 例 + Go 40 例 + Python 31 例（不依赖 core） | 解析结果字段、错误码与发现规则正确 | 契约稳定性（三个扩展均已覆盖） |
 
 **故意改错演示**：把 R3 排序比较器由 `Comparator.comparing(Dependency::riskLevel).reversed()` 改成自然序，T1 变红；`git checkout -- <file>` 恢复后变绿。
 
@@ -333,7 +335,7 @@ licenselens/
 | --- | --- |
 | 一个核心场景 | `scan` 一条命令 → 报告 + 退出码 |
 | 一种扩展机制 + 一个独立扩展 | `DependencySource` SPI + npm 插件 |
-| 有效测试 | T1—T9（T7 待补、T9 已由 npm 39 例覆盖）；故意改错演示 |
+| 有效测试 | T1—T9（T7 待补、T9 已由 npm 39 + Go 40 + Python 31 例覆盖）；故意改错演示 |
 | 基础质量控制 | Checkstyle + `mvn -B verify` |
 | 真实协作 | 每人一条分支 + 一次实质 Review + README 协作表 |
 | CI | GitHub Actions 保留一次绿色运行记录 |
@@ -350,7 +352,7 @@ licenselens/
 | 扫描引擎 / 策略引擎 / 报告渲染 | 本组 | 全部 |
 | CLI / 退出码 / 插件加载 | 本组 | 全部 |
 
-README 同时声明：许可证快照为课程级数据，当前仅 4 条 Maven 坐标（规划中的约 40 条未达成），结论不构成法律意见，快照可替换。
+README 同时声明：许可证快照为课程级数据，当前 54 条，覆盖 Maven / npm / Go / Python，按 `ecosystem:name` 精确匹配并回退纯名称，结论不构成法律意见，快照可替换。
 
 ---
 
@@ -378,7 +380,7 @@ licenselens/
 ├─ licenselens-spi/             # 空
 ├─ licenselens-core/            # 空
 ├─ licenselens-cli/             # 空
-├─ plugins/licenselens-npm/     # 空（独立 reactor）
+├─ plugins/licenselens-npm/     # 空（只依赖 spi，后续纳入根 reactor）
 ├─ docs/                        # 空
 ├─ samples/demo-maven/          # 放样例 pom.xml
 └─ .github/workflows/ci.yml     # 空
@@ -387,7 +389,7 @@ licenselens/
 
 # 3. 全组 Review，签字确认
 
-# 4. 起草 licenses.json（当前 4 条，按样例命中情况扩充）
+# 4. 起草 licenses.json（初始 4 条，按样例命中情况扩充至当前 54 条）
 
 # 5. 起草 demo-maven/pom.xml 样例（4 条依赖：GPL + EPL + 2× Apache）
 ```
@@ -418,14 +420,14 @@ licenselens/
 | 三人能统一环境（JDK 21.0.2 + Maven 3.9.x） | 各自验证 | 统一脚本，记录环境差异 |
 | Checkstyle 配置能复用 L08 | 直接复制跑一次 | 微调规则，不影响其他 |
 | 老师认可这个选题 | 邮件确认 | 换题（备选 OpenConvert，规格类似） |
-| 当前 4 条许可证快照够答辩用 | 实跑 demo-maven 4 条依赖均命中 | 按未命中项补录常见依赖 |
+| 初始 4 条许可证快照够答辩用 | 实跑 demo-maven 4 条依赖均命中；后续已扩充至 54 条 | 按未命中项继续补录常见依赖 |
 
 ---
 
 ## 十五、已知限制（写进 README）
 
 ```text
-本次实现：Maven 清单解析、npm 清单解析（扩展，已合入）、Go 清单解析（扩展，已合入）、许可证快照匹配、两种策略、Markdown 报告、CLI 入口、退出码、Checkstyle + CI
+本次实现：Maven 清单解析、npm 清单解析（扩展）、Go 清单解析（扩展）、Python 清单解析（扩展）、许可证快照匹配、两种策略、Markdown 报告、CLI 入口、退出码、Checkstyle + CI
 本次不做：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容
 结论声明：许可证快照为课程级数据，结论不构成法律意见
 ```
