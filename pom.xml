@@ -17,9 +17,13 @@
         <module>licenselens-spi</module>
         <module>licenselens-core</module>
         <module>licenselens-cli</module>
+        <module>plugins/licenselens-npm</module>
+        <module>plugins/licenselens-go</module>
+        <module>plugins/licenselens-python</module>
+        <module>distribution</module>
     </modules>
 
-    <!-- plugins/licenselens-npm 独立 reactor，不加入 parent -->
+    <!-- 插件模块仅依赖 spi；distribution 负责统一装配可运行目录 -->
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -74,8 +78,18 @@
                     <artifactId>maven-shade-plugin</artifactId>
                     <version>3.5.1</version>
                 </plugin>
-        </plugins>
-    </pluginManagement>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>3.7.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>3.4.0</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
 
     <plugins>
         <plugin>

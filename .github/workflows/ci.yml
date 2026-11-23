@@ -25,24 +25,8 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build and Test core reactor
+      - name: Build, test and assemble distribution
         run: mvn -B clean verify
 
-      # 独立插件 reactor：先安装 parent + SPI，再逐个构建
-      # 用 working-directory 而非 cd && ...，保证 Ubuntu/PowerShell 通用
-      - name: Install parent + SPI
-        run: |
-          mvn -B -N install -DskipTests
-          mvn -B -pl licenselens-spi install -DskipTests
-
-      - name: Build npm plugin
-        working-directory: plugins/licenselens-npm
-        run: mvn -B clean verify
-
-      - name: Build go plugin
-        working-directory: plugins/licenselens-go
-        run: mvn -B clean verify
-
-      - name: Build python plugin
-        working-directory: plugins/licenselens-python
-        run: mvn -B clean verify
+      - name: Smoke test assembled CLI
+        run: java -jar distribution/target/dist/licenselens-cli.jar scan --manifest samples/demo-npm/package-lock.json --plugins distribution/target/dist/plugins --out report.md

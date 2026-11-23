@@ -32,24 +32,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build core reactor
-        run: mvn -B clean verify
-
-      - name: Install parent + SPI
-        run: |
-          mvn -B -N install -DskipTests
-          mvn -B -pl licenselens-spi install -DskipTests
-
-      - name: Build npm plugin
-        working-directory: plugins/licenselens-npm
-        run: mvn -B clean verify
-
-      - name: Build go plugin
-        working-directory: plugins/licenselens-go
-        run: mvn -B clean verify
-
-      - name: Build python plugin
-        working-directory: plugins/licenselens-python
+      - name: Build and assemble distribution
         run: mvn -B clean verify
 
       # Linux 发行物：tar.gz + run.sh
@@ -59,18 +42,13 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           PLATFORM="linux"
           STAGE="licenselens-${TAG}-${PLATFORM}"
-          mkdir -p "$STAGE/bin" "$STAGE/plugins"
-          cp licenselens-cli/target/licenselens-cli-*.jar "$STAGE/bin/licenselens-cli.jar"
-          cp plugins/licenselens-npm/target/licenselens-npm-*.jar "$STAGE/plugins/"
-          cp plugins/licenselens-go/target/licenselens-go-*.jar "$STAGE/plugins/"
-          cp plugins/licenselens-python/target/licenselens-python-*.jar "$STAGE/plugins/"
-          cp -r samples "$STAGE/samples"
-          cp README.md LICENSE "$STAGE/"
+          rm -rf "$STAGE"
+          cp -r distribution/target/dist "$STAGE"
           cat > "$STAGE/run.sh" <<EOF
           #!/usr/bin/env bash
           # LicenseLens ${TAG} — Linux 启动脚本
           SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-          java -jar "\$SCRIPT_DIR/bin/licenselens-cli.jar" "\$@"
+          java -jar "\$SCRIPT_DIR/licenselens-cli.jar" "\$@"
           EOF
           chmod +x "$STAGE/run.sh"
           cat > "$STAGE/RUN.md" <<EOF
@@ -82,9 +60,9 @@ jobs:
             ./run.sh scan --manifest samples/demo-maven/pom.xml
 
           方式二，手动执行 jar：
-            java -jar bin/licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml --plugins plugins
+            java -jar licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml --plugins plugins
 
-          当前版本可扫描 Maven 清单；npm、Go 与 Python 插件 jar 已随包提供在 plugins/，扫描 package-lock.json、go.mod 与 requirements.txt 可得到依赖与风险摘要。
+          当前版本可扫描 Maven、npm、Go 与 Python 清单；插件 jar 已随包提供在 plugins/。
           EOF
           tar -czf "licenselens-${TAG}-${PLATFORM}.tar.gz" "$STAGE"
           sha256sum "licenselens-${TAG}-${PLATFORM}.tar.gz" > "licenselens-${TAG}-${PLATFORM}.tar.gz.sha256"
@@ -97,17 +75,12 @@ jobs:
           $TAG = $env:GITHUB_REF_NAME
           $PLATFORM = "windows"
           $STAGE = "licenselens-$TAG-$PLATFORM"
-          New-Item -ItemType Directory -Force -Path "$STAGE/bin", "$STAGE/plugins" | Out-Null
-          Copy-Item licenselens-cli/target/licenselens-cli-*.jar "$STAGE/bin/licenselens-cli.jar"
-          Copy-Item plugins/licenselens-npm/target/licenselens-npm-*.jar "$STAGE/plugins/"
-          Copy-Item plugins/licenselens-go/target/licenselens-go-*.jar "$STAGE/plugins/"
-          Copy-Item plugins/licenselens-python/target/licenselens-python-*.jar "$STAGE/plugins/"
-          Copy-Item -Recurse samples "$STAGE/samples"
-          Copy-Item README.md, LICENSE "$STAGE/"
+          if (Test-Path $STAGE) { Remove-Item -Recurse -Force $STAGE }
+          Copy-Item -Recurse distribution/target/dist $STAGE
           @"
           @echo off
           rem LicenseLens $TAG — Windows 启动脚本
-          java -jar "%~dp0bin\licenselens-cli.jar" %*
+          java -jar "%~dp0licenselens-cli.jar" %*
           "@ | Set-Content -Encoding UTF8 "$STAGE/run.bat"
           @"
           # LicenseLens $TAG (Windows)
@@ -118,9 +91,9 @@ jobs:
             run.bat scan --manifest samples\demo-maven\pom.xml
 
           方式二，手动执行 jar：
-            java -jar bin\licenselens-cli.jar scan --manifest samples\demo-maven\pom.xml --plugins plugins
+            java -jar licenselens-cli.jar scan --manifest samples\demo-maven\pom.xml --plugins plugins
 
-          当前版本可扫描 Maven 清单；npm、Go 与 Python 插件 jar 已随包提供在 plugins/，扫描 package-lock.json、go.mod 与 requirements.txt 可得到依赖与风险摘要。
+          当前版本可扫描 Maven、npm、Go 与 Python 清单；插件 jar 已随包提供在 plugins 目录。
           "@ | Set-Content -Encoding UTF8 "$STAGE/RUN.md"
           Compress-Archive -Path "$STAGE" -DestinationPath "licenselens-$TAG-$PLATFORM.zip"
           $hash = (Get-FileHash "licenselens-$TAG-$PLATFORM.zip" -Algorithm SHA256).Hash.ToLower()

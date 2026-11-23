@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  这个插件是独立 reactor，不属于 parent pom 的 modules。
-  理由：扩展要能单独构建、单独发布、核心源码不改。
+  这个插件只依赖 licenselens-spi，保持可单独构建；同时作为根 reactor 的模块参与统一装配。
+  理由：扩展可独立验证、独立替换，核心源码不改；distribution 负责收集插件 jar。
   编译期依赖树验证：pom 里只允许出现 licenselens-spi，不能出现 licenselens-core。
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
