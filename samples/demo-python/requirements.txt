@@ -1,0 +1,6 @@
+# demo-python：Python 依赖清单样例
+# 用于验证 requirements.txt 插件（P4）：固定版本、范围约束、行尾注释
+
+requests==2.31.0
+flask>=2.2,<3.0
+numpy==1.26.4   # 科学计算
