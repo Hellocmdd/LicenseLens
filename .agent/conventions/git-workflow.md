@@ -6,7 +6,7 @@
 
 | 分支 | 用途 | 命名 | 从哪来、回哪去 |
 | --- | --- | --- | --- |
-| `main` | 主干，保护分支，只接受 PR 合并 | 固定 | — |
+| `main` / `master` | 主干，保护分支，只接受 PR 合并；当前仓库以 `master` 为主，`ci.yml` 同时覆盖两者 | 固定 | — |
 | `feat/*` | 新功能 | `feat/scanner-engine`、`feat/npm-parser` | 从 `main` 切出，合回 `main` |
 | `fix/*` | 缺陷修复 | `fix/sort-order`、`fix/exit-code-4` | 同上 |
 | `test/*` | 测试补充 | `test/t1-normal-scan` | 同上 |

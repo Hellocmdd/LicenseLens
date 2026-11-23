@@ -48,6 +48,10 @@ jobs:
         working-directory: plugins/licenselens-go
         run: mvn -B clean verify
 
+      - name: Build python plugin
+        working-directory: plugins/licenselens-python
+        run: mvn -B clean verify
+
       # Linux 发行物：tar.gz + run.sh
       - name: Package distribution (Linux)
         if: matrix.platform == 'linux'
@@ -59,6 +63,7 @@ jobs:
           cp licenselens-cli/target/licenselens-cli-*.jar "$STAGE/bin/licenselens-cli.jar"
           cp plugins/licenselens-npm/target/licenselens-npm-*.jar "$STAGE/plugins/"
           cp plugins/licenselens-go/target/licenselens-go-*.jar "$STAGE/plugins/"
+          cp plugins/licenselens-python/target/licenselens-python-*.jar "$STAGE/plugins/"
           cp -r samples "$STAGE/samples"
           cp README.md LICENSE "$STAGE/"
           cat > "$STAGE/run.sh" <<EOF
@@ -79,7 +84,7 @@ jobs:
           方式二，手动执行 jar：
             java -jar bin/licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml --plugins plugins
 
-          当前为骨架版本，业务方法尚未实现，扫描不会产出完整报告。
+          当前版本可扫描 Maven 清单；npm、Go 与 Python 插件 jar 已随包提供在 plugins/，扫描 package-lock.json、go.mod 与 requirements.txt 可得到依赖与风险摘要。
           EOF
           tar -czf "licenselens-${TAG}-${PLATFORM}.tar.gz" "$STAGE"
           sha256sum "licenselens-${TAG}-${PLATFORM}.tar.gz" > "licenselens-${TAG}-${PLATFORM}.tar.gz.sha256"
@@ -96,6 +101,7 @@ jobs:
           Copy-Item licenselens-cli/target/licenselens-cli-*.jar "$STAGE/bin/licenselens-cli.jar"
           Copy-Item plugins/licenselens-npm/target/licenselens-npm-*.jar "$STAGE/plugins/"
           Copy-Item plugins/licenselens-go/target/licenselens-go-*.jar "$STAGE/plugins/"
+          Copy-Item plugins/licenselens-python/target/licenselens-python-*.jar "$STAGE/plugins/"
           Copy-Item -Recurse samples "$STAGE/samples"
           Copy-Item README.md, LICENSE "$STAGE/"
           @"
@@ -114,7 +120,7 @@ jobs:
           方式二，手动执行 jar：
             java -jar bin\licenselens-cli.jar scan --manifest samples\demo-maven\pom.xml --plugins plugins
 
-          当前为骨架版本，业务方法尚未实现，扫描不会产出完整报告。
+          当前版本可扫描 Maven 清单；npm、Go 与 Python 插件 jar 已随包提供在 plugins/，扫描 package-lock.json、go.mod 与 requirements.txt 可得到依赖与风险摘要。
           "@ | Set-Content -Encoding UTF8 "$STAGE/RUN.md"
           Compress-Archive -Path "$STAGE" -DestinationPath "licenselens-$TAG-$PLATFORM.zip"
           $hash = (Get-FileHash "licenselens-$TAG-$PLATFORM.zip" -Algorithm SHA256).Hash.ToLower()

@@ -42,3 +42,7 @@ jobs:
       - name: Build go plugin
         working-directory: plugins/licenselens-go
         run: mvn -B clean verify
+
+      - name: Build python plugin
+        working-directory: plugins/licenselens-python
+        run: mvn -B clean verify

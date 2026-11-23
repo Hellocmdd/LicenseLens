@@ -46,17 +46,17 @@ licenselens/
 | 2 | `licenselens-core/ScanEngine` | 代码 | A | 扫描调度：选择解析器、收集结果、触发策略 | npm / Go 扩展实现 |
 | 3 | `licenselens-core/PolicyEngine` | 代码 | A | 策略引擎：campus + permissive-only 两种策略实现 | npm / Go 扩展实现 |
 | 4 | `licenselens-core/ReportRenderer` | 代码 | A | 报告渲染：Markdown 生成、确定性排序（风险降序→名称升序） | npm / Go 扩展实现 |
-| 5 | `licenselens-core/licenses.json` | 数据 | A | 许可证快照：约 40 条常见 Maven 依赖，精确匹配 groupId:artifactId | npm / Go 扩展实现 |
+| 5 | `licenselens-core/licenses.json` | 数据 | A | 许可证快照：当前 4 条 Maven 坐标（规划约 40 条未达成），精确匹配 groupId:artifactId | npm / Go 扩展实现 |
 | 6 | `licenselens-core/internal/MavenManifestParser` | 代码 | C | Maven 清单解析：pom.xml → `List<Dependency>`，JDK 自带 XML | 核心调度、策略、报告渲染 |
 | 7 | `licenselens-cli` 全部 | 代码 | C | 入口类、参数解析（`--manifest/--policy/--plugins/--out`）、退出码、插件目录加载（URLClassLoader + ServiceLoader） | npm / Go 扩展实现 |
-| 8 | `plugins/licenselens-npm` | 代码 | B | 全部：`package-lock.json`（v1/v2/v3）→ `List<Dependency>`，实现 `DependencySource` | core 内部任何类；Maven 解析器 |
-| 8a | `plugins/licenselens-go` | 代码 | B | 全部：`go.mod`（require 块 / 单行 require / `/vN` 主版本）→ `List<Dependency>`，实现 `DependencySource` | core 内部任何类；Maven 解析器 |
+| 8 | `plugins/licenselens-npm` | 代码 | B | 已实现并合入 `master`：`package-lock.json`（v1/v2/v3）→ `List<Dependency>`，39 个契约测试通过 | core 内部任何类；Maven 解析器 |
+| 8a | `plugins/licenselens-go` | 代码 | B | 已实现并合入 `master`：`go.mod`（require 块 / 单行 require / `/vN` 主版本）→ `List<Dependency>`，40 个契约测试通过 | core 内部任何类；Maven 解析器 |
 | 9 | 核心单测（T1-T6） | 测试 | A + C | T1 正常流程、T2 策略差异、T3 空输入、T4 非预期输入、T5 文件不存在、T6 XML 语法错误 | npm / Go 扩展测试 |
-| 10 | 扩展契约测试（T9） | 测试 | B | 不依赖 core，只验证 spi 契约：npm / Go 两个扩展的输入输出字段、错误码 | core 内部测试 |
-| 11 | 扩展集成测试（T7-T8） | 测试 | A + B | T7 放入 npm / Go 插件后 CLI 自动发现、T8 移走全部插件后退出码 4 | — |
+| 10 | 扩展契约测试（T9） | 测试 | B | npm 39 例 + Go 40 例已通过（不依赖 core），验证输入输出字段、错误码与发现规则 | core 内部测试 |
+| 11 | 扩展集成测试（T7-T8） | 测试 | A + B | T7 放入已构建插件 jar 后 CLI 自动发现（用例待补）、T8 移走全部插件后退出码 4 | — |
 | 12 | `docs/CONTRACT.md` | 文档 | A 起草 | 一页纸：接口签名 + 退出码表 + 错误契约 + 兼容策略 | — |
 | 13 | `docs/DESIGN.docx` | 文档 | A 主笔 | 架构图（A）、核心流程图（A）、npm / Go 扩展接入示例（B）、CLI 退出码表（C）、测试矩阵（A+C） | — |
-| 14 | `samples/` | 样例 | 三人各出 | A：demo-maven/pom.xml + expected/report.md；B：demo-npm/package-lock.json + 三种版本 fixture、demo-go/go.mod 及变体；C：edge/empty.xml + edge/bad-lock.json | — |
+| 14 | `samples/` | 样例 | 三人各出 | A：demo-maven/pom.xml；B：demo-npm/package-lock.json + v1/v2 fixture、demo-go/go.mod 及变体与 edge/bad-go.mod、edge/empty-go.mod；C：edge/empty.xml、bad-pom.xml、bad-lock.json、placeholder-pom.xml、management-pom.xml（不设 expected/report.md） | — |
 | 15 | GitHub Actions CI | 配置 | C | `mvn -B verify` push 触发，保留一次绿色运行记录 | — |
 | 16 | Checkstyle 配置 | 配置 | C | `verify` 阶段绑定 `maven-checkstyle-plugin:check`；规则集在 `config/checkstyle/checkstyle.xml`，L08 原件未提供前用按代码风格约束落的最小集合，拿到 L08 后替换 | — |
 | 17 | README.md | 文档 | 三人协作 | 用户场景 + 快速开始（C）+ 核心与扩展（A）+ 测试与质量（A+C）+ 协作规则（C）+ 成员贡献表（全员填）+ AI 核验（全员填） | — |
@@ -102,7 +102,7 @@ CLI (licenselens-cli)                     ← C 写入口
 
 | 分支 | 用途 | 命名 |
 | --- | --- | --- |
-| `main` | 主干，保护分支，只接受合并 | 固定 |
+| `main` / `master` | 主干，保护分支，只接受合并；当前仓库与 CI 以 `master` 为主，`ci.yml` 同时覆盖两者 | 固定 |
 | `feat/*` | 新功能开发 | `feat/scanner-engine`、`feat/npm-parser` |
 | `fix/*` | Bug 修复 | `fix/sort-order`、`fix/exit-code-4` |
 | `test/*` | 测试编写 | `test/t1-normal-scan` |
@@ -177,8 +177,8 @@ chore(ci): add checkstyle step to verify
 | --- | --- | --- | --- |
 | **P0 契约冻结** | A 起草，全组 Review | Day 1 | CONTRACT.md 三人签字；任何业务代码不得开始 |
 | **P1 骨架搭建** | C 主建，A/B 配合 | Day 2 | parent pom + 三模块 + npm 空插件；`mvn -B compile` 全过；Checkstyle 配置就绪；CI workflow 推送 |
-| **P2 核心功能** | A + C 并行 | Day 3-4 | MavenManifestParser 能解析 demo-maven → 4 条 Dependency；ScanEngine + PolicyEngine + ReportRenderer 跑通；9 个测试全绿；故意改错演示准备好 |
-| **P3 扩展接入** | B 主写，A 接线 | Day 5 | npm / Go 插件实现完成；放入 plugins/ 后 CLI 自动发现；移走全部插件后退出码 4；契约测试 + 集成测试全绿；A Review B 的扩展（必须提具体意见） |
+| **P2 核心功能** | A + C 并行 | Day 3-4 | MavenManifestParser 能解析 demo-maven → 4 条 Dependency；ScanEngine + PolicyEngine + ReportRenderer 跑通；核心/CLI 26 个测试全绿；故意改错演示准备好 |
+| **P3 扩展接入** | B 主写，A 接线 | Day 5 | npm / Go 插件均已实现并合入 master（39 / 40 个契约测试通过）；构建 jar 放入 plugins/ 后 CLI 自动发现；移走全部插件后退出码 4；T7 CLI 集成用例待补；A Review B 的扩展（必须提具体意见） |
 | **P4 CLI 完善** | C | Day 5-6 | 参数解析 + 退出码 + 插件加载；四种失败路径退出码正确；终端摘要格式确认 |
 | **P5 故意改错演示** | A 准备，三人排练 | Day 6 | 改排序比较器 → T1 红 → 恢复 → 绿；完整流程跑一遍，计时 < 6 分钟 |
 | **P6 质量与发布** | C 主理，全组配合 | Day 6-7 | `mvn -B clean verify` 全过；CI 绿色记录；Tag v0.1.0 附注；SHA-256 计算；RELEASE.md 填写 |
@@ -228,7 +228,7 @@ spi (P1) ← npm / Go 扩展 (P3) ← 可以和 core 并行
 ### 5.3 范围边界（写进 README）
 
 ```text
-本次实现：Maven 清单解析、npm 清单解析（扩展）、Go 清单解析（扩展）、许可证快照匹配、两种策略、Markdown 报告、CLI 入口、退出码、Checkstyle + CI
+本次实现：Maven 清单解析、npm 清单解析（扩展，已合入）、Go 清单解析（扩展，已合入）、许可证快照匹配、两种策略、Markdown 报告、CLI 入口、退出码、Checkstyle + CI
 本次不做：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容
 结论声明：许可证快照为课程级数据，结论不构成法律意见
 ```
@@ -265,8 +265,8 @@ mvn -B checkstyle:check
 mvn -B clean verify
 
 # 跑演示脚本
-java -jar licenselens-cli/target/licenselens-cli-0.1.0.jar scan --manifest samples/demo-maven/pom.xml
-java -jar licenselens-cli/target/licenselens-cli-0.1.0.jar scan --manifest samples/demo-maven/pom.xml --policy permissive-only
+java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-maven/pom.xml
+java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-maven/pom.xml --policy permissive-only
 ```
 
 **Reviewer 自己确认通过后才能 Approve。**
@@ -277,11 +277,11 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0.jar scan --manifest sampl
 git status                    # 必须干净
 mvn -B clean verify           # 必须通过
 git rev-list -n 1 v0.1.0      # Tag 必须指向 HEAD
-# 实跑三条演示命令
-java -jar ... scan --manifest samples/demo-maven/pom.xml
-java -jar ... scan --manifest samples/demo-maven/pom.xml --policy permissive-only
-java -jar ... scan --manifest samples/demo-npm/package-lock.json --plugins plugins
-java -jar ... scan --manifest samples/demo-go/go.mod --plugins plugins
+# 实跑演示命令（npm / Go 场景需先构建插件 jar 并复制到 plugins/）
+java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-maven/pom.xml
+java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-maven/pom.xml --policy permissive-only
+java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-npm/package-lock.json --plugins plugins
+java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-go/go.mod --plugins plugins
 Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 ```
 
@@ -328,6 +328,7 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | --- | --- | --- | --- |
 | 2026-11-17 | v1.0 初始版本 | Gate 0 契约冻结 | A/B/C 全员签字 |
 | 2026-11-18 | 对齐 Go 扩展的模块归属、测试、门禁与答辩分工；Checkstyle 纳入 verify | 仓库已有 `plugins/licenselens-go`；L08 原件未提供，先按代码风格约束落最小规则集 | 待全员 Review |
+| 2026-11-22 | 按当前 master 同步文档状态：npm / Go 均已合入，快照 4 条，测试 26+39+40=105，T7 待补，命令与样例对齐 | 本地 master 已快进至 origin/master `9c865ea`（含 PR #5 / #6），README/DESIGN/规划/案例/.agent/工作流同步 | 待全员 Review |
 
 ---
 
