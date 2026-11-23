@@ -6,8 +6,8 @@ package edu.course.licenselens.cli;
  *   <li>0 = 正常，无阻断依赖</li>
  *   <li>1 = 存在阻断依赖（业务拒绝）</li>
  *   <li>2 = 清单文件不存在</li>
- *   <li>3 = XML/JSON 语法错误</li>
- *   <li>4 = 无可用解析器（需安装 npm/gradle 等插件）</li>
+ *   <li>3 = 清单语法错误（XML / JSON / 文本）</li>
+ *   <li>4 = 无可用解析器（需安装 npm / Go / Python 等插件）</li>
  * </ul>
  */
 public enum ExitCode {

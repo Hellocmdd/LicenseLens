@@ -34,7 +34,7 @@ public class Main {
             用法: licenselens scan --manifest <文件> [选项]
 
             选项:
-              --manifest <路径>    清单文件（pom.xml / package-lock.json / go.mod）  [必填]
+              --manifest <路径>    清单文件（pom.xml / package-lock.json / go.mod / requirements.txt）  [必填]
               --policy <策略>      campus | permissive-only                        [默认: campus]
               --plugins <目录>     插件目录                                         [默认: ./plugins]
               --out <路径>         报告输出路径                                     [默认: ./report.md]
