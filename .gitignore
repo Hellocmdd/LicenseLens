@@ -41,3 +41,6 @@ coverage/
 
 # logs or temp files
 output/
+
+# demo for enhancing the architecture
+plugin-evolution-lab/
