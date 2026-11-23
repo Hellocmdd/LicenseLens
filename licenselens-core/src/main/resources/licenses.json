@@ -4,20 +4,210 @@
     "name": "Apache License 2.0",
     "risk": "PERMISSIVE"
   },
+  "org.apache.commons:commons-lang": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.apache.commons:commons-collections4": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.apache.commons:commons-io": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.apache.commons:commons-validator": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
   "com.google.guava:guava": {
     "spdxId": "Apache-2.0",
     "name": "Apache License 2.0",
     "risk": "PERMISSIVE"
+  },
+  "com.google.code.findbugs:jsr305": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "com.google.code.gson:gson": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "com.fasterxml.jackson.core:jackson-core": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "com.fasterxml.jackson.core:jackson-databind": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "com.fasterxml.jackson.core:jackson-annotations": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.slf4j:slf4j-api": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE"
+  },
+  "org.slf4j:slf4j-simple": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE"
+  },
+  "ch.qos.logback:logback-classic": {
+    "spdxId": "EPL-1.0",
+    "name": "Eclipse Public License 1.0",
+    "risk": "WEAK_COPYLEFT",
+    "note": "EPL-1.0 是弱 copyleft，修改后须公开"
+  },
+  "ch.qos.logback:logback-core": {
+    "spdxId": "EPL-1.0",
+    "name": "Eclipse Public License 1.0",
+    "risk": "WEAK_COPYLEFT"
   },
   "org.junit.jupiter:junit-jupiter": {
     "spdxId": "EPL-2.0",
     "name": "Eclipse Public License 2.0",
     "risk": "WEAK_COPYLEFT"
   },
+  "org.junit.jupiter:junit-jupiter-api": {
+    "spdxId": "EPL-2.0",
+    "name": "Eclipse Public License 2.0",
+    "risk": "WEAK_COPYLEFT"
+  },
+  "org.junit.jupiter:junit-jupiter-engine": {
+    "spdxId": "EPL-2.0",
+    "name": "Eclipse Public License 2.0",
+    "risk": "WEAK_COPYLEFT"
+  },
+  "org.junit.platform:junit-platform-launcher": {
+    "spdxId": "EPL-2.0",
+    "name": "Eclipse Public License 2.0",
+    "risk": "WEAK_COPYLEFT"
+  },
+  "org.mockito:mockito-core": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE"
+  },
+  "org.mockito:mockito-junit-jupiter": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE"
+  },
+  "org.projectlombok:lombok": {
+    "spdxId": "MIT",
+    "name": "MIT License",
+    "risk": "PERMISSIVE",
+    "note": "注意 lombok.jar 内含 Agent 路径"
+  },
+  "org.springframework:spring-context": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.springframework:spring-core": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.springframework:spring-webmvc": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.apache.tomcat.embed:tomcat-embed-core": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.apache.httpcomponents:httpclient": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.apache.httpcomponents.client5:httpclient5": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.modelmapper:modelmapper": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "io.projectreactor:reactor-core": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "io.netty:netty-all": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
   "mysql:mysql-connector-java": {
     "spdxId": "GPL-2.0",
     "name": "GNU General Public License v2.0",
     "risk": "STRONG_COPYLEFT",
     "note": "含 FOSS 例外条款，课程场景按强 copyleft 提示"
+  },
+  "com.mysql:mysql-connector-j": {
+    "spdxId": "GPL-2.0",
+    "name": "GNU General Public License v2.0",
+    "risk": "STRONG_COPYLEFT",
+    "note": "新坐标，同样 GPL-2.0 + FOSS 例外"
+  },
+  "org.postgresql:postgresql": {
+    "spdxId": "PostgreSQL",
+    "name": "PostgreSQL License",
+    "risk": "PERMISSIVE"
+  },
+  "org.xerial:sqlite-jdbc": {
+    "spdxId": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "risk": "PERMISSIVE"
+  },
+  "org.hibernate:hibernate-core": {
+    "spdxId": "LGPL-2.1-only",
+    "name": "GNU Lesser General Public License v2.1 only",
+    "risk": "WEAK_COPYLEFT",
+    "note": "LGPL 允许动态链接，但修改后须公开"
+  },
+  "jakarta.persistence:jakarta.persistence-api": {
+    "spdxId": "EPL-2.0",
+    "name": "Eclipse Public License 2.0",
+    "risk": "WEAK_COPYLEFT"
+  },
+  "jakarta.annotation:jakarta.annotation-api": {
+    "spdxId": "EPL-2.0",
+    "name": "Eclipse Public License 2.0",
+    "risk": "WEAK_COPYLEFT"
+  },
+  "jakarta.xml.bind:jakarta.xml.bind-api": {
+    "spdxId": "BSD-3-Clause",
+    "name": "BSD 3-Clause License",
+    "risk": "PERMISSIVE"
+  },
+  "org.json:json": {
+    "spdxId": "JSON",
+    "name": "JSON License",
+    "risk": "PERMISSIVE",
+    "note": "注意 JSON License 与 GPL 不兼容"
+  },
+  "javax.xml.bind:jaxb-api": {
+    "spdxId": "BSD-3-Clause",
+    "name": "BSD 3-Clause License",
+    "risk": "PERMISSIVE"
   }
 }
