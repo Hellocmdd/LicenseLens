@@ -107,7 +107,7 @@ public class ScanEngine {
         int unknownCount = 0;
 
         for (Dependency dep : deps) {
-            LicenseInfo info = catalog.lookup(dep.name());
+            LicenseInfo info = catalog.lookup(dep);
             Decision dec = policy.evaluate(info, dep);
             rows.add(new ReportRenderer.ScanRow(dep, info, dec));
             if (!dec.allowed()) blockedCount++;
