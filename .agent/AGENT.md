@@ -14,7 +14,7 @@
 LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单，匹配许可证快照，按策略判定风险，输出可核对的 Markdown 报告与退出码。
 
 ```text
-依赖清单（pom.xml / package-lock.json / go.mod）
+依赖清单（pom.xml / package-lock.json / go.mod / requirements.txt）
   → CLI 加载内置与外部解析器（DependencySource）
   → ScanEngine 调度：选择解析器 → 解析为 List<Dependency>
   → LicenseCatalog 查快照 → Policy 判定 Decision
@@ -29,9 +29,10 @@ LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单�
 | `licenselens-spi` | 公开契约：`DependencySource` / `Policy` / `Decision` / `LicenseInfo` / `RiskLevel` / `Dependency` / `ManifestRef` / `SourceException`；**零第三方依赖** | parent reactor |
 | `licenselens-core` | 扫描调度、策略引擎、报告渲染、`licenses.json` 快照；内置 Maven 解析器（`internal` 包，属基础能力，不是扩展） | parent reactor |
 | `licenselens-cli` | 参数解析、退出码、插件目录加载（`URLClassLoader` + `ServiceLoader`） | parent reactor |
-| `plugins/licenselens-npm` | 独立扩展：`package-lock.json`（v1/v2/v3）解析，已合入 `master`，39 个契约测试通过 | 独立 reactor，只依赖 spi |
-| `plugins/licenselens-go` | 独立扩展：`go.mod` 解析，已合入 `master`，40 个契约测试通过 | 独立 reactor，只依赖 spi |
-| `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` 解析（本分支新增），31 个契约测试通过 | 独立 reactor，只依赖 spi |
+| `plugins/licenselens-npm` | 独立扩展：`package-lock.json`（v1/v2/v3）解析，39 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
+| `plugins/licenselens-go` | 独立扩展：`go.mod` 解析，40 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
+| `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` 解析，31 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
+| `distribution` | 统一装配 CLI 与三个插件 jar 到 `target/dist/`，供本地运行与发布复用 | 根 reactor 模块 |
 | `samples/` | 各模块样例与边界样例，测试直接引用 | — |
 | `docs/` | `CONTRACT.md`（契约）、分工合作书、`DESIGN.docx`（设计文档） | — |
 
@@ -41,22 +42,24 @@ LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单�
 - **退出码**：`0` 正常 / `1` 存在阻断依赖 / `2` 清单文件不存在 / `3` 清单语法错误 / `4` 无可用解析器。插件 jar 加载失败属降级：告警后跳过，不中断扫描。
 - **注册与选择**：内置 Maven 解析器由构造注入，不走 ServiceLoader；外部插件靠 jar 内 `META-INF/services/edu.course.licenselens.spi.DependencySource` 声明，按 `id()` 字典序取第一个 `supports()` 为 true 的解析器（内置 Maven 的 id 为 `maven`）。
 - **确定性输出**：报告排序固定为风险降序，同风险等级内按名称升序；风险序为 `STRONG_COPYLEFT` → `WEAK_COPYLEFT` → `PERMISSIVE` → `UNKNOWN`（**不是** `RiskLevel` 的声明顺序，别直接用 `ordinal()`）。同一输入排序一致；报告含生成时间，字节不完全一致。
-- **许可证快照**：`licenses.json` 按 `groupId:artifactId` 精确匹配，当前收录 42 条 Maven 坐标；未命中时返回 `UNKNOWN` 占位，不得猜测许可证。
+- **许可证快照**：`licenses.json` 当前收录 54 条，覆盖 Maven / npm / Go / Python；先按 `ecosystem:name` 精确匹配，未命中回退纯名称，最后返回 `UNKNOWN` 占位，不得猜测许可证。
 - **范围边界（本次不做）**：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容。许可证结论为课程级判断，不构成法律意见。
 
 常用命令（项目根目录执行）：
 
 ```bash
-mvn -B clean verify                                      # 核心 reactor：编译 + 测试 + Checkstyle
-mvn -B -N install -DskipTests                            # 装 parent
-mvn -B -pl licenselens-spi install -DskipTests           # 装 spi
-mvn -B -f plugins/licenselens-npm/pom.xml clean verify    # npm 扩展：39 个契约测试
-cp plugins/licenselens-npm/target/licenselens-npm-0.1.0-SNAPSHOT.jar plugins/
-mvn -B -f plugins/licenselens-go/pom.xml clean verify     # Go 扩展：40 个契约测试
-cp plugins/licenselens-go/target/licenselens-go-0.1.0-SNAPSHOT.jar plugins/
-mvn -B -f plugins/licenselens-python/pom.xml clean verify # Python 扩展：31 个契约测试
-cp plugins/licenselens-python/target/licenselens-python-0.1.0-SNAPSHOT.jar plugins/
-java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-maven/pom.xml
+mvn -B clean verify   # 全模块构建、测试、Checkstyle 与 distribution 装配
+
+# 主流程：CLI 与插件 jar 已装配到 distribution/target/dist/
+java -jar distribution/target/dist/licenselens-cli.jar scan \
+  --manifest samples/demo-maven/pom.xml \
+  --plugins distribution/target/dist/plugins
+
+# 单独验证某个插件（只产出模块 target/，需用 --plugins 指向）
+mvn -B -f plugins/licenselens-npm/pom.xml clean verify
+java -jar distribution/target/dist/licenselens-cli.jar scan \
+  --manifest samples/demo-npm/package-lock.json \
+  --plugins plugins/licenselens-npm/target
 ```
 
 ## 三、角色与任务
