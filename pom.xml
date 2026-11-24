@@ -21,9 +21,10 @@
         <module>plugins/licenselens-go</module>
         <module>plugins/licenselens-python</module>
         <module>distribution</module>
+        <module>licenselens-it</module>
     </modules>
 
-    <!-- 插件模块仅依赖 spi；distribution 负责统一装配可运行目录 -->
+    <!-- 插件模块仅依赖 spi；distribution 统一装配；licenselens-it 消费装配产物做端到端测试 -->
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
