@@ -2,3 +2,4 @@
 # 每行一个实现类的全限定名
 edu.course.licenselens.python.RequirementsManifestParser
 edu.course.licenselens.python.UvManifestParser
+edu.course.licenselens.python.CondaManifestParser

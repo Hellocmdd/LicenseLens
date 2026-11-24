@@ -1,0 +1,11 @@
+name: demo-python
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy=1.26.4
+  - pandas>=2.1
+  - conda-forge::scipy=1.11.0
+  - pip:
+      - requests==2.31.0
+      - flask>=2.2,<3.0

@@ -1,0 +1,18 @@
+# 示例锁文件：由 conda-lock 生成，多平台重复条目（此处为模拟）
+version: 1
+metadata:
+  content_hash:
+    linux-64: 0123456789abcdef
+package:
+  - name: numpy
+    version: "1.26.4"
+    manager: conda
+    platform: linux-64
+  - name: numpy
+    version: "1.26.4"
+    manager: conda
+    platform: osx-64
+  - name: requests
+    version: "2.31.0"
+    manager: pip
+    platform: linux-64
