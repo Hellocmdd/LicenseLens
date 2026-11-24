@@ -97,9 +97,9 @@ java -jar licenselens-cli.jar scan \
 
 退出码：`0` 正常 / `1` 存在阻断依赖 / `2` 清单文件不存在 / `3` 清单语法错误 / `4` 无可用解析器。参数错误（缺值、未知参数、未知策略）当前也返回 `2`——契约退出码表暂无"用法错误"一档。详见 `docs/CONTRACT.md`。
 
-交付物运行方式参见并列 `release/RELEASE.md`（发布阶段创建）。
+交付物运行方式写在仓库外的 `release/RELEASE.md`（发布阶段创建），不纳入仓库提交。
 
-推送 `v*` 版本的 Tag 会触发 `.github/workflows/release.yml`：在 Ubuntu 与 Windows 双平台上分别构建并打包平台专属发行物——Linux 出 `.tar.gz` + `run.sh`，Windows 出 `.zip` + `run.bat`，两者都含 CLI fat jar、插件 jars、samples 和 `RUN.md`，并各生成同名 `.sha256` 校验文件。两份产物经 Artifact 汇总后，以 Tag 为版本号一次性发布到同一个 GitHub Release（自动生成 Release Notes）。课程要求的 `release/RELEASE.md` 与 ZIP 内最终 SHA-256 仍按交付约定人工维护，不依赖流水线代填。
+推送 `v*` 版本的 Tag 会触发 `.github/workflows/release.yml`：在 Ubuntu 与 Windows 双平台上分别构建并打包平台专属发行物——Linux 出 `.tar.gz` + `run.sh`，Windows 出 `.zip` + `run.bat`，两者都含 CLI fat jar、插件 jars、samples 和 `RUN.md`，并各生成同名 `.sha256` 校验文件。两份产物经 Artifact 汇总后，以 Tag 为版本号一次性发布到同一个 GitHub Release（自动生成 Release Notes）。`release/RELEASE.md` 由发布者在仓库外维护，记录最终 Commit、产物 SHA-256 与实际运行结果；流水线负责生成并上传各平台的 `.sha256` 校验文件。
 
 ## 核心与扩展
 
@@ -141,9 +141,9 @@ java -jar licenselens-cli.jar scan \
 
 构建即检查：`mvn -B clean verify` 现在构建全部 8 个模块（parent、spi、core、cli、三个插件与 `distribution`），同时执行编译、测试与 Checkstyle（`verify` 阶段绑定 `maven-checkstyle-plugin:check`）。规则集在 `config/checkstyle/checkstyle.xml`，依据项目代码风格硬约束落的最小集合；课程 L08 原始规则集未随仓库提供，拿到后以 L08 为准替换并单独说明。插件 POM 仍通过 `../../config/checkstyle/checkstyle.xml` 引用，`distribution` 无源码故跳过 Checkstyle。检测到告警即构建失败，不使用 suppression 绕过。
 
-CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上执行 `mvn -B clean verify`；该命令已覆盖核心、插件与装配模块。`.github/workflows/ci-npm-plugin.yml`、`.github/workflows/ci-go-plugin.yml` 与 `.github/workflows/ci-python-plugin.yml` 分别仅在 `feat/npm-parser`、`feat/go-parser`、`feat/python-plugin` 分支的 push / PR 触发，单独验证对应扩展；`.github/workflows/release.yml` 在 `v*` Tag 触发双平台打包。本地命令序列见“快速开始”；远端真实运行记录以 GitHub Actions 页面为准。
+CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上执行 `mvn -B clean verify`；该命令已覆盖核心、插件与装配模块。装配后还有一步 smoke：断言四种样例在默认 `./plugins` 下的退出码与终端摘要（T7），并在移走 `plugins/` 后断言三种扩展清单返回 4、内置 Maven 样例仍可用（T8）。`.github/workflows/ci-npm-plugin.yml`、`.github/workflows/ci-go-plugin.yml` 与 `.github/workflows/ci-python-plugin.yml` 分别仅在 `feat/npm-parser`、`feat/go-parser`、`feat/python-plugin` 分支的 push / PR 触发，单独验证对应扩展；`.github/workflows/release.yml` 在 `v*` Tag 触发双平台打包。本地命令序列见“快速开始”；远端真实运行记录以 GitHub Actions 页面为准。
 
-测试已就位：根目录 `mvn -B clean verify` 运行 161 个用例（core 41 + cli 10 + npm 39 + Go 40 + Python 31），覆盖核心链路与三种扩展；同时产出可直接运行的 `distribution/target/dist/`。T7（CLI 放入/移走插件的端到端集成）仍待补，已手工验证装配目录内扫描四种样例均能发现对应插件，Maven 样例因阻断依赖返回 1，其余返回 0，不放入插件时仍返回 4。实际执行结果：一条 `BUILD SUCCESS`，161 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
+测试已就位：根目录 `mvn -B clean verify` 运行 161 个用例（core 41 + cli 10 + npm 39 + Go 40 + Python 31），覆盖核心链路与三种扩展；同时产出可直接运行的 `distribution/target/dist/`。T7/T8 现由 CI smoke 步骤在双平台自动覆盖，不再只靠手工验证：装配目录内扫描四种样例均能发现对应插件，Maven 样例因阻断依赖返回 1，其余返回 0；移走 `plugins/` 后三种扩展清单返回 4。JUnit 层的 CLI 集成测试模块仍待补。实际执行结果：一条 `BUILD SUCCESS`，161 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
 
 ## 协作与贡献入口
 
