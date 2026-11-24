@@ -143,7 +143,7 @@ java -jar licenselens-cli.jar scan \
 
 CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上执行 `mvn -B clean verify`；该命令已覆盖核心、插件与装配模块。装配后还有一步 smoke：断言四种样例在默认 `./plugins` 下的退出码与终端摘要（T7），并在移走 `plugins/` 后断言三种扩展清单返回 4、内置 Maven 样例仍可用（T8）。`.github/workflows/ci-npm-plugin.yml`、`.github/workflows/ci-go-plugin.yml` 与 `.github/workflows/ci-python-plugin.yml` 分别仅在 `feat/npm-parser`、`feat/go-parser`、`feat/python-plugin` 分支的 push / PR 触发，单独验证对应扩展；`.github/workflows/release.yml` 在 `v*` Tag 触发双平台打包。本地命令序列见“快速开始”；远端真实运行记录以 GitHub Actions 页面为准。
 
-测试已就位：根目录 `mvn -B clean verify` 运行 161 个用例（core 41 + cli 10 + npm 39 + Go 40 + Python 31），覆盖核心链路与三种扩展；同时产出可直接运行的 `distribution/target/dist/`。T7/T8 现由 CI smoke 步骤在双平台自动覆盖，不再只靠手工验证：装配目录内扫描四种样例均能发现对应插件，Maven 样例因阻断依赖返回 1，其余返回 0；移走 `plugins/` 后三种扩展清单返回 4。JUnit 层的 CLI 集成测试模块仍待补。实际执行结果：一条 `BUILD SUCCESS`，161 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
+测试已就位：根目录 `mvn -B clean verify` 运行 165 个用例（core 41 + cli 14 + npm 39 + Go 40 + Python 31），覆盖核心链路、三种扩展与插件加载错误路径；同时产出可直接运行的 `distribution/target/dist/`。T7/T8 现由 CI smoke 步骤在双平台自动覆盖，不再只靠手工验证：装配目录内扫描四种样例均能发现对应插件，Maven 样例因阻断依赖返回 1，其余返回 0；移走 `plugins/` 后三种扩展清单返回 4。JUnit 层的 CLI 集成测试模块仍待补。实际执行结果：一条 `BUILD SUCCESS`，165 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
 
 ## 协作与贡献入口
 
