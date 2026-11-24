@@ -66,10 +66,10 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 输入 | `pom.xml` 或 `package-lock.json`（通过 `supports()` 自动识别） |
-| 参数 | `--manifest`（必填）、`--policy`（默认 campus）、`--plugins`（默认 ./plugins）、`--out`（默认 ./report.md） |
-| 中间产物 | 无（纯内存处理，确定性输出） |
-| 输出 | `report.md` + 终端摘要 + 退出码 |
+| 输入 | `pom.xml`、`package-lock.json`、`go.mod` 或 `requirements.txt`（通过 `supports()` 自动识别） |
+| 参数 | `--manifest`（必填）、`--policy`（默认 campus）、`--plugins`（默认 ./plugins）、`--catalog`（外置许可证快照）、`--format`（默认 markdown，可选 json）、`--out`（默认 ./report.md） |
+| 中间产物 | 无（纯内存处理，报告排序确定） |
+| 输出 | Markdown 或 JSON 报告 + 终端摘要 + 退出码 |
 | 耗时 | 未实测，不设为验收指标 |
 
 ### 2.3 核心能力具体化（三条铁规则）
@@ -298,7 +298,7 @@ licenselens/
 | T4 | 边界 | 依赖名含 `$` 占位符 | 保留原样并标记 UNKNOWN | 非预期输入 |
 | T5 | 失败 | 不存在的路径 | 退出码 2，提示含路径 | 错误反馈 |
 | T6 | 失败 | 损坏的 XML（`samples/edge/bad-pom.xml`） | 退出码 3，提示含行号（> 0） | 错误定位 |
-| T7 | 扩展 | `distribution` 装配后扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；CLI 级集成用例待补 | 扩展接入（计划） |
+| T7 | 扩展 | `distribution` 装配后扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；`licenselens-it` 的 JUnit 集成测试覆盖 | 扩展接入（已覆盖） |
 | T8 | 扩展 | 移走插件 jar 后扫同一文件 | 退出码 4，提示安装插件 | 降级行为 |
 | T9 | 契约 | npm 39 例 + Go 40 例 + Python 31 例（不依赖 core） | 解析结果字段、错误码与发现规则正确 | 契约稳定性（三个扩展均已覆盖） |
 
@@ -324,7 +324,7 @@ licenselens/
 | 许可证快照被追问准确性 | 中 | 中 | README 声明"课程级快照，非法律意见，可替换" |
 | Maven 属性占位符 `${project.version}` 解析不全 | 中 | 高 | 明确只支持直接声明，占位符标记 UNKNOWN |
 | 范围膨胀想加 Web/Gradle/传递依赖 | 高 | 高 | 范围边界写进 README，评审时直接拒绝 |
-| 插件类加载报错难排查 | 中 | 中 | 打印插件名 + 异常类型 + 跳过继续 |
+| 插件类加载报错难排查 | 中 | 中 | 已按 jar 输出异常类型与插件名，损坏 jar 结构也显式告警后跳过 |
 | 发布后补记录导致 SHA 失效 | 中 | 中 | RELEASE.md 放仓库外 release/ 目录 |
 
 ---
@@ -335,7 +335,7 @@ licenselens/
 | --- | --- |
 | 一个核心场景 | `scan` 一条命令 → 报告 + 退出码 |
 | 一种扩展机制 + 一个独立扩展 | `DependencySource` SPI + npm 插件 |
-| 有效测试 | T1—T9（T7 待补、T9 已由 npm 39 + Go 40 + Python 31 例覆盖）；故意改错演示 |
+| 有效测试 | T1—T9（T7/T8 已由 `licenselens-it` 覆盖，T9 已由 npm 39 + Go 40 + Python 31 例覆盖）；故意改错演示 |
 | 基础质量控制 | Checkstyle + `mvn -B verify` |
 | 真实协作 | 每人一条分支 + 一次实质 Review + README 协作表 |
 | CI | GitHub Actions 保留一次绿色运行记录 |
@@ -427,7 +427,7 @@ licenselens/
 ## 十五、已知限制（写进 README）
 
 ```text
-本次实现：Maven 清单解析、npm 清单解析（扩展）、Go 清单解析（扩展）、Python 清单解析（扩展）、许可证快照匹配、两种策略、Markdown 报告、CLI 入口、退出码、Checkstyle + CI
+本次实现：Maven 清单解析（含 modules 递归展开）、npm / Go / Python 清单解析（扩展）、内置与外置许可证快照、两种策略、Markdown / JSON 报告、CLI 入口与退出码、Checkstyle + 双平台 CI、T7/T8 集成测试
 本次不做：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容
 结论声明：许可证快照为课程级数据，结论不构成法律意见
 ```

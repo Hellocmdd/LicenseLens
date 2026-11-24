@@ -1,6 +1,6 @@
 # LicenseLens
 
-开源依赖许可证合规审计器。输入项目的依赖清单，输出带许可证风险判定的 Markdown 报告。
+开源依赖许可证合规审计器。输入项目的依赖清单，输出带许可证风险判定的 Markdown 或 JSON 报告。
 
 - 仓库地址：[https://github.com/Hellocmdd/LicenseLens](https://github.com/Hellocmdd/LicenseLens)（SSH：`git@github.com:Hellocmdd/LicenseLens.git`）
 - 系统设计：`docs/DESIGN.docx`（系统设计文档）、`docs/CONTRACT.md`（扩展契约）、`docs/LicenseLens分工合作书.md`（分工与协作规则）
@@ -13,12 +13,12 @@
 ```text
 依赖清单（pom.xml / package-lock.json / go.mod / requirements.txt）
     → 核心调度选择解析器 → 解析为统一依赖列表
-    → 查许可证快照 → 策略判定 → 可核对的 Markdown 报告 + 退出码
+    → 查许可证快照 → 策略判定 → 可核对的 Markdown / JSON 报告 + 退出码
 ```
 
-**基础能力**（内置于核心）：Maven `pom.xml` 解析（递归展开 `<modules>` 并按依赖四元组去重）、许可证快照匹配、`campus` 与 `permissive-only` 两种策略、Markdown 报告、CLI 入口与退出码。
+**基础能力**（内置于核心）：Maven `pom.xml` 解析（递归展开 `<modules>` 并按依赖四元组去重）、内置与外置许可证快照匹配、`campus` 与 `permissive-only` 两种策略、Markdown / JSON 报告、CLI 入口与退出码。
 
-**扩展新增能力**：通过独立 jar 接入新的清单格式。npm `package-lock.json`（v1/v2/v3）与 Go `go.mod` 均已实现并合入 `master`；Python `requirements.txt` 支持在本分支新增（31 个契约测试）。插件 POM 可单独构建；根 reactor 的 `distribution` 模块会自动把 CLI 与所有插件 jar 装配到 `distribution/target/dist/`，无需手工复制，核心源码无需改动。
+**扩展新增能力**：通过独立 jar 接入新的清单格式。npm `package-lock.json`（v1/v2/v3）、Go `go.mod` 与 Python `requirements.txt` 均已实现并合入 `master`（39 / 40 / 31 个契约测试）。插件 POM 可单独构建；根 reactor 的 `distribution` 模块会自动把 CLI 与所有插件 jar 装配到 `distribution/target/dist/`，无需手工复制，核心源码无需改动。
 
 **本次不做**：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容。许可证快照为课程级数据，结论不构成法律意见。
 
