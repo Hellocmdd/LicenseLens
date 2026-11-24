@@ -1,12 +1,12 @@
-# 插件分支专用 CI：只验证 Python 扩展，不依赖 core / cli 的完成度。
+﻿# 插件分支专用 CI：只验证 Python 扩展，不依赖 core / cli 的完成度。
 # 主 CI（ci.yml）由 C 负责，仅在 main/master 触发；本文件不改动它。
 name: Python Plugin CI
 
 on:
   push:
-    branches: ['feat/python-plugin']
+    branches: ['feat/python-plugin', 'feat/python-uv']
   pull_request:
-    branches: ['feat/python-plugin']
+    branches: ['feat/python-plugin', 'feat/python-uv']
 
 permissions:
   contents: read
@@ -41,7 +41,7 @@ jobs:
           mvn -B -N install -DskipTests
           mvn -B -pl licenselens-spi install -DskipTests
 
-      - name: Verify Python plugin (31 contract tests)
+      - name: Verify Python plugin (52 contract tests)
         working-directory: plugins/licenselens-python
         run: mvn -B clean verify
 
