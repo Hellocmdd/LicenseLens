@@ -6,6 +6,7 @@ import edu.course.licenselens.spi.RiskLevel;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -65,7 +66,7 @@ public class LicenseCatalog {
                 System.err.println("WARN: licenses.json 未找到，许可证快照为空");
                 return map;
             }
-            String content = new String(is.readAllBytes());
+            String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             JSONObject root = new JSONObject(content);
             for (String key : root.keySet()) {
                 JSONObject obj = root.getJSONObject(key);

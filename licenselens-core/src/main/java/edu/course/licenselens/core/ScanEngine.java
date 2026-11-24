@@ -9,7 +9,9 @@ import edu.course.licenselens.spi.Policy;
 import edu.course.licenselens.spi.RiskLevel;
 import edu.course.licenselens.spi.SourceException;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -73,9 +75,9 @@ public class ScanEngine {
         // 2. 构建 ManifestRef（含首行嗅探）
         String fileName = manifest.getFileName().toString();
         String firstLine;
-        try {
-            firstLine = Files.readString(manifest).lines()
-                    .findFirst().orElse("");
+        try (BufferedReader reader = Files.newBufferedReader(manifest, StandardCharsets.UTF_8)) {
+            String line = reader.readLine();
+            firstLine = line == null ? "" : line;
         } catch (IOException e) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
                     "无法读取文件: " + e.getMessage());
@@ -94,8 +96,9 @@ public class ScanEngine {
                     selected = src;
                     break;
                 }
-            } catch (Throwable t) {
-                // 某个解析器 supports 抛异常 → 跳过继续找
+            } catch (RuntimeException e) {
+                System.err.println("WARN: 解析器 " + src.id()
+                        + " 的 supports 抛异常（已跳过）: " + e.getMessage());
             }
         }
         if (selected == null) {
