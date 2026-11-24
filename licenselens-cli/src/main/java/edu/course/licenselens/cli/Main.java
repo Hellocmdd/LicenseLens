@@ -83,7 +83,6 @@ public class Main {
 
         List<DependencySource> sources = new ArrayList<>();
         sources.add(new MavenManifestParser());
-        sources.addAll(new PluginLoader().loadAll(options.pluginsDir().toFile()));
 
         List<Policy> policies = List.of(new CampusPolicy(), new PermissiveOnlyPolicy());
         PolicyEngine policyEngine = new PolicyEngine(policies);
@@ -93,9 +92,10 @@ public class Main {
             return usageError(e.getMessage() + "，可选: " + policyIds(policies));
         }
 
-        ScanEngine engine = new ScanEngine(new LicenseCatalog(), sources, policyEngine);
+        try (PluginLoader pluginLoader = new PluginLoader()) {
+            sources.addAll(pluginLoader.loadAll(options.pluginsDir()));
 
-        try {
+            ScanEngine engine = new ScanEngine(new LicenseCatalog(), sources, policyEngine);
             ScanResult result = engine.scan(manifest, options.policyId());
 
             if (!writeReport(options.out(), result.reportContent())) {
