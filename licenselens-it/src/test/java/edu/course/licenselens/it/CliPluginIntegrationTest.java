@@ -103,6 +103,8 @@ class CliPluginIntegrationTest {
                 "--plugins", plugins.toString(),
                 "--out", report.toString()
         );
+        builder.environment().put("JAVA_TOOL_OPTIONS",
+                "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8");
         builder.directory(dist().toFile());
         builder.redirectOutput(stdout.toFile());
         builder.redirectError(stderr.toFile());

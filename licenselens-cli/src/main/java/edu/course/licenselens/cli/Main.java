@@ -12,6 +12,7 @@ import edu.course.licenselens.spi.Policy;
 import edu.course.licenselens.spi.SourceException;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +50,8 @@ public class Main {
     private static final String DEFAULT_OUT = "./report.md";
 
     public static void main(String[] args) {
+        System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
+        System.setErr(new PrintStream(System.err, true, StandardCharsets.UTF_8));
         ExitCode code = run(args);
         System.exit(code.code);
     }
