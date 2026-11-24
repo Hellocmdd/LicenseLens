@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.stream.Stream;
+import java.util.zip.ZipFile;
 
 /**
  * 插件目录加载器，负责发现外部 {@link DependencySource} 实现并管理其类加载器。
@@ -46,6 +47,13 @@ public class PluginLoader implements AutoCloseable {
     }
 
     private void loadOne(Path jar, List<DependencySource> sources) {
+        try (ZipFile ignored = new ZipFile(jar.toFile())) {
+            // 损坏 jar 会被 URLClassLoader 静默忽略，先校验结构以便按 jar 名告警
+        } catch (IOException e) {
+            warn(jar, "无法打开", e);
+            return;
+        }
+
         try {
             URL url = jar.toUri().toURL();
             URLClassLoader loader = new URLClassLoader(new URL[]{url},
