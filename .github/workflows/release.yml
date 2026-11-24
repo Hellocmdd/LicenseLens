@@ -48,6 +48,7 @@ jobs:
           #!/usr/bin/env bash
           # LicenseLens ${TAG} — Linux 启动脚本
           SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+          cd "\$SCRIPT_DIR" || exit 1
           java -jar "\$SCRIPT_DIR/licenselens-cli.jar" "\$@"
           EOF
           chmod +x "$STAGE/run.sh"
@@ -80,6 +81,7 @@ jobs:
           @"
           @echo off
           rem LicenseLens $TAG — Windows 启动脚本
+          cd /d "%~dp0"
           java -jar "%~dp0licenselens-cli.jar" %*
           "@ | Set-Content -Encoding UTF8 "$STAGE/run.bat"
           @"
