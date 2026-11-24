@@ -126,11 +126,27 @@ class UvManifestParserTest {
                     "dependencies = [",
                     "    \"requests[socks]==2.31.0 ; python_version >= \\\"3.9\\\"\",",
                     "    \"uvicorn[standard] @ https://example.com/uvicorn.whl\",",
+                    "    \"pkg @ https://example.test/pkg.whl ; python_version >= \\\"3.9\\\"\",",
                     "]"));
 
             assertEquals(List.of(
                     dep("requests", "2.31.0", "runtime"),
-                    dep("uvicorn", "https://example.com/uvicorn.whl", "runtime")), parser.parse(file));
+                    dep("uvicorn", "https://example.com/uvicorn.whl", "runtime"),
+                    dep("pkg", "https://example.test/pkg.whl", "runtime")), parser.parse(file));
+        }
+
+        @Test
+        void ignoresNonDependencyProjectArrays() throws IOException, SourceException {
+            Path file = write("pyproject.toml", String.join("\n",
+                    "[project]",
+                    "name = \"demo\"",
+                    "classifiers = [",
+                    "    \"Development Status :: 4 - Beta\",",
+                    "]",
+                    "keywords = [\"one\", \"two\"]",
+                    "dependencies = [\"requests>=2\"]"));
+
+            assertEquals(List.of(dep("requests", ">=2", "runtime")), parser.parse(file));
         }
 
         @Test

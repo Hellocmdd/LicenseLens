@@ -129,6 +129,10 @@ public class UvManifestParser implements DependencySource {
             if (equals < 0 || !code.substring(equals + 1).strip().startsWith("[")) {
                 continue;
             }
+            if (section.equals("project")
+                    && !code.substring(0, equals).strip().equals("dependencies")) {
+                continue;
+            }
             List<String> values = new ArrayList<>();
             List<Integer> valueLines = new ArrayList<>();
             i = collectArray(lines, i, values, valueLines) - 1;
@@ -334,6 +338,10 @@ public class UvManifestParser implements DependencySource {
             }
             rest = rest.substring(close + 1).strip();
         }
+        int marker = rest.indexOf(';');
+        if (marker >= 0) {
+            rest = rest.substring(0, marker).strip();
+        }
 
         String version;
         if (rest.startsWith("@")) {
@@ -343,10 +351,6 @@ public class UvManifestParser implements DependencySource {
                         "直接引用缺少 URL: " + code, lineNo);
             }
         } else {
-            int marker = rest.indexOf(';');
-            if (marker >= 0) {
-                rest = rest.substring(0, marker).strip();
-            }
             if (rest.isEmpty()) {
                 version = "";
             } else if (SPECIFIER.matcher(rest).matches()) {

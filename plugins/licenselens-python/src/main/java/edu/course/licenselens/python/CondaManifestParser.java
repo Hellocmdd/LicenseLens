@@ -227,7 +227,9 @@ public class CondaManifestParser implements DependencySource {
 
     private static void add(List<Dependency> dependencies, Set<String> seen,
                             Dependency dependency, int lineNo) throws SourceException {
-        if (!seen.add(dependency.name().toLowerCase(Locale.ROOT))) {
+        String key = dependency.ecosystem() + ":"
+                + dependency.name().toLowerCase(Locale.ROOT);
+        if (!seen.add(key)) {
             throw new SourceException(SourceException.Code.PARSE_ERROR,
                     "重复的依赖: " + dependency.name(), lineNo);
         }
@@ -283,6 +285,10 @@ public class CondaManifestParser implements DependencySource {
             }
             rest = rest.substring(close + 1).strip();
         }
+        int marker = rest.indexOf(';');
+        if (marker >= 0) {
+            rest = rest.substring(0, marker).strip();
+        }
         String version;
         if (rest.startsWith("@")) {
             version = rest.substring(1).strip();
@@ -291,10 +297,6 @@ public class CondaManifestParser implements DependencySource {
                         "直接引用缺少 URL: " + spec, lineNo);
             }
         } else {
-            int marker = rest.indexOf(';');
-            if (marker >= 0) {
-                rest = rest.substring(0, marker).strip();
-            }
             if (rest.isEmpty()) {
                 version = "";
             } else if (SPECIFIER.matcher(rest).matches()) {

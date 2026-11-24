@@ -152,6 +152,29 @@ class CondaManifestParserTest {
         }
 
         @Test
+        void allowsSameNameAcrossDifferentEcosystems() throws IOException, SourceException {
+            Path file = write("environment.yml", """
+                    dependencies:
+                      - numpy=1.26.4
+                      - pip:
+                          - numpy==1.26.4
+                    """);
+            assertEquals(List.of(conda("numpy", "1.26.4", "runtime"),
+                    python("numpy", "1.26.4", "runtime")), parser.parse(file));
+        }
+
+        @Test
+        void stripsMarkersBeforeParsingDirectUrls() throws IOException, SourceException {
+            Path file = write("environment.yml", """
+                    dependencies:
+                      - pip:
+                          - pkg @ https://example.test/pkg.whl ; python_version >= "3.9"
+                    """);
+            assertEquals(List.of(python("pkg", "https://example.test/pkg.whl", "runtime")),
+                    parser.parse(file));
+        }
+
+        @Test
         void devFileNameMarksScope() throws IOException, SourceException {
             Path file = write("dev-environment.yml", """
                     dependencies:
