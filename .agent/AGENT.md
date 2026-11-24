@@ -33,6 +33,7 @@ LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单�
 | `plugins/licenselens-go` | 独立扩展：`go.mod` 解析，40 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
 | `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` 解析，31 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
 | `distribution` | 统一装配 CLI 与三个插件 jar 到 `target/dist/`，供本地运行与发布复用 | 根 reactor 模块 |
+| `licenselens-it` | 基于装配产物的 CLI 插件集成测试：T7/T8 与加载失败降级 | 根 reactor 模块 |
 | `samples/` | 各模块样例与边界样例，测试直接引用 | — |
 | `docs/` | `CONTRACT.md`（契约）、分工合作书、`DESIGN.docx`（设计文档） | — |
 

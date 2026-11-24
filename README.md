@@ -118,10 +118,11 @@ java -jar licenselens-cli.jar scan \
 | `licenselens-cli`         | 参数解析、退出码、`URLClassLoader + ServiceLoader` 插件加载                       | C                          |
 | `plugins/licenselens-npm` | 独立扩展：npm `package-lock.json` v1/v2/v3 解析（已合入 `master`）                | B                          |
 | `plugins/licenselens-go`  | 独立扩展：Go `go.mod` 解析（已合入 `master`，40 个契约测试）                     | B                          |
-| `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` 解析（本分支新增，31 个契约测试）            | C                          |
+| `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` 解析（已合入 `master`，31 个契约测试）        | C                          |
 | `distribution`            | 统一装配 CLI 与插件 jar 到 `target/dist/`，供本地运行和发布打包复用                | C                          |
+| `licenselens-it`          | 基于装配产物的 CLI 插件集成测试：T7/T8 与加载失败降级                              | —                          |
 
-扩展只依赖 `licenselens-spi`，pom 中不得出现 `licenselens-core`。接入方式：在扩展 jar 的 `META-INF/services/edu.course.licenselens.spi.DependencySource` 中声明实现类全限定名，并把 jar 放入 `--plugins` 指定目录（只扫描该目录下的一级 `*.jar`）；根 reactor 的 `distribution` 模块会自动完成这一步。禁用则移走 jar。CLI 每次运行都重新加载插件目录，无需重启；插件加载器在 JVM 退出时统一关闭。核验“核心源码不变”的方法：对比接入前后 `licenselens-core/` 与 `licenselens-cli/` 的 Git 历史，应无改动。
+扩展只依赖 `licenselens-spi`，pom 中不得出现 `licenselens-core`。接入方式：在扩展 jar 的 `META-INF/services/edu.course.licenselens.spi.DependencySource` 中声明实现类全限定名，并把 jar 放入 `--plugins` 指定目录（只扫描该目录下的一级 `*.jar`）；根 reactor 的 `distribution` 模块会自动完成这一步。禁用则移走 jar。CLI 每次运行都重新加载插件目录，无需重启；插件类加载器在每次扫描结束后关闭。核验“核心源码不变”的方法：对比接入前后 `licenselens-core/` 与 `licenselens-cli/` 的 Git 历史，应无改动。
 
 接口契约、注册规则、错误约定与兼容策略见 `docs/CONTRACT.md`。
 
@@ -147,11 +148,11 @@ java -jar licenselens-cli.jar scan \
 
 ## 测试与检查
 
-构建即检查：`mvn -B clean verify` 现在构建全部 8 个模块（parent、spi、core、cli、三个插件与 `distribution`），同时执行编译、测试与 Checkstyle（`verify` 阶段绑定 `maven-checkstyle-plugin:check`）。规则集在 `config/checkstyle/checkstyle.xml`，依据项目代码风格硬约束落的最小集合；课程 L08 原始规则集未随仓库提供，拿到后以 L08 为准替换并单独说明。插件 POM 仍通过 `../../config/checkstyle/checkstyle.xml` 引用，`distribution` 无源码故跳过 Checkstyle。检测到告警即构建失败，不使用 suppression 绕过。
+构建即检查：`mvn -B clean verify` 现在构建全部 9 个模块（parent、spi、core、cli、三个插件、`distribution` 与 `licenselens-it`），同时执行编译、测试与 Checkstyle（`verify` 阶段绑定 `maven-checkstyle-plugin:check`）。规则集在 `config/checkstyle/checkstyle.xml`，依据项目代码风格硬约束落的最小集合；课程 L08 原始规则集未随仓库提供，拿到后以 L08 为准替换并单独说明。插件 POM 仍通过 `../../config/checkstyle/checkstyle.xml` 引用，`distribution` 无源码故跳过 Checkstyle。检测到告警即构建失败，不使用 suppression 绕过。
 
 CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上执行 `mvn -B clean verify`；该命令已覆盖核心、插件与装配模块。装配后还有一步 smoke：断言四种样例在默认 `./plugins` 下的退出码与终端摘要（T7），并在移走 `plugins/` 后断言三种扩展清单返回 4、内置 Maven 样例仍可用（T8）。`.github/workflows/ci-npm-plugin.yml`、`.github/workflows/ci-go-plugin.yml` 与 `.github/workflows/ci-python-plugin.yml` 分别仅在 `feat/npm-parser`、`feat/go-parser`、`feat/python-plugin` 分支的 push / PR 触发，单独验证对应扩展；`.github/workflows/release.yml` 在 `v*` Tag 触发双平台打包。本地命令序列见“快速开始”；远端真实运行记录以 GitHub Actions 页面为准。
 
-测试已就位：根目录 `mvn -B clean verify` 运行 174 个用例（core 47 + cli 17 + npm 39 + Go 40 + Python 31），覆盖核心链路、Maven 模块展开、外置快照与 JSON 报告、三种扩展与插件加载错误路径；同时产出可直接运行的 `distribution/target/dist/`。T7/T8 现由 CI smoke 步骤在双平台自动覆盖，不再只靠手工验证：装配目录内扫描四种样例均能发现对应插件，Maven 样例因阻断依赖返回 1，其余返回 0；移走 `plugins/` 后三种扩展清单返回 4。JUnit 层的 CLI 集成测试模块仍待补。实际执行结果：一条 `BUILD SUCCESS`，174 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
+测试已就位：根目录 `mvn -B clean verify` 运行 178 个用例（core 47 + cli 17 + npm 39 + Go 40 + Python 31 + it 4），覆盖核心链路、Maven 模块展开、外置快照与 JSON 报告、三种扩展、插件加载错误路径与 CLI 端到端插件接入；同时产出可直接运行的 `distribution/target/dist/`。T7/T8 由 `licenselens-it` 的 JUnit 集成测试与 CI smoke 双平台共同覆盖：插件 jar 放入目录后自动发现并解析 npm 清单，移走后返回 4，损坏 jar 与服务声明错误的 jar 告警后跳过且不影响正常插件。实际执行结果：一条 `BUILD SUCCESS`，178 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
 
 ## 协作与贡献入口
 
@@ -171,4 +172,4 @@ CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时�
 
 项目采用 MIT License，理由：课程作业以开放协作为目标，MIT 条款简单、对依赖方限制最少。关键依赖：`org.json`（core 解析 `licenses.json`）、JUnit（测试）与 Maven 插件，均按其各自许可证使用，未在仓库中捆绑第三方二进制；`org.json` 的许可证条款（JSON License 及其历史附加条款）需在发布前核对。
 
-已知限制：`supports()` 对 npm 只认精确文件名 `package-lock.json`，对 Go 只认 `go.mod`，对 Python 认文件名含 `requirement` 的 `.txt/.in/.pip`，`*.v1.json`、`go.single-require.mod` 等 fixture 供契约测试使用，手工演示需复制改名；`licenses.json` 收录 54 条，按 `ecosystem:name` 精确匹配并回退纯名称，未命中才为 `UNKNOWN`；参数错误复用退出码 `2`，契约暂无“用法错误”一档；报告含生成时间，同一输入输出排序确定但字节不一致，跨平台路径分隔符也不同；外置快照只替换匹配表，缺失或非法时回退内置，JSON 报告字段顺序固定但同样含生成时间；Maven 解析器会递归展开 `<modules>` 并按依赖四元组去重，但不解析继承、属性占位符或 `<profiles>`，也不做传递依赖分析；T7/T8 的行为由 CI smoke 覆盖，JUnit 层 CLI 集成测试仍待补；`docs/DESIGN.docx` 已随工程提交，`release/RELEASE.md` 尚未完成。当前版本可对 Maven、npm、Go、Python 清单产出审计报告，不覆盖传递依赖分析、联网查询与源码扫描。
+已知限制：`supports()` 对 npm 只认精确文件名 `package-lock.json`，对 Go 只认 `go.mod`，对 Python 认文件名含 `requirement` 的 `.txt/.in/.pip`，`*.v1.json`、`go.single-require.mod` 等 fixture 供契约测试使用，手工演示需复制改名；`licenses.json` 收录 54 条，按 `ecosystem:name` 精确匹配并回退纯名称，未命中才为 `UNKNOWN`；参数错误复用退出码 `2`，契约暂无“用法错误”一档；报告含生成时间，同一输入输出排序确定但字节不一致，跨平台路径分隔符也不同；外置快照只替换匹配表，缺失或非法时回退内置，JSON 报告字段顺序固定但同样含生成时间；Maven 解析器会递归展开 `<modules>` 并按依赖四元组去重，但不解析继承、属性占位符或 `<profiles>`，也不做传递依赖分析；T7/T8 由 `licenselens-it` 的 JUnit 集成测试与 CI smoke 共同覆盖；`docs/DESIGN.docx` 已随工程提交，`release/RELEASE.md` 尚未完成。当前版本可对 Maven、npm、Go、Python 清单产出审计报告，不覆盖传递依赖分析、联网查询与源码扫描。
