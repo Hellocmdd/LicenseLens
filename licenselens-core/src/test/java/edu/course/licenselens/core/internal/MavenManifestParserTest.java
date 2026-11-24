@@ -143,6 +143,39 @@ class MavenManifestParserTest {
     }
 
     @Test
+    @DisplayName("profiles 内的依赖不应计入实际依赖")
+    void shouldIgnoreDependenciesInsideProfiles() throws IOException, SourceException {
+        Path pom = tempDir.resolve("pom.xml");
+        Files.writeString(pom, """
+                <project>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>active</artifactId>
+                      <version>1.0</version>
+                    </dependency>
+                  </dependencies>
+                  <profiles>
+                    <profile>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.example</groupId>
+                          <artifactId>profile-only</artifactId>
+                          <version>2.0</version>
+                        </dependency>
+                      </dependencies>
+                    </profile>
+                  </profiles>
+                </project>
+                """, StandardCharsets.UTF_8);
+
+        List<Dependency> deps = parser.parse(pom);
+
+        assertEquals(1, deps.size());
+        assertEquals("org.example:active", deps.get(0).name());
+    }
+
+    @Test
     @DisplayName("P2 父 POM：递归展开 <modules>，按坐标去重且忽略 dependencyManagement")
     void shouldExpandModulesAndDeduplicate() throws IOException, SourceException {
         writePom(tempDir.resolve("pom.xml"), """

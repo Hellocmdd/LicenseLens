@@ -185,4 +185,45 @@ class LicenseCatalogTest {
 
         assertEquals("MIT", info.spdxId());
     }
+
+    @Test
+    @DisplayName("外置快照风险枚举非法：回退内置快照")
+    void shouldFallBackWhenExternalCatalogHasUnknownRisk() throws IOException {
+        Path external = tempDir.resolve("licenses.json");
+        Files.writeString(external, """
+                {
+                  "npm:lodash": {
+                    "spdxId": "GPL-3.0",
+                    "name": "GNU GPL v3",
+                    "risk": "STRONG_COPYLFT"
+                  }
+                }
+                """, StandardCharsets.UTF_8);
+
+        LicenseInfo info = new LicenseCatalog(external).lookup(
+                new Dependency("npm", "lodash", "4.17.21", "runtime"));
+
+        assertEquals("MIT", info.spdxId());
+        assertEquals(RiskLevel.PERMISSIVE, info.risk());
+    }
+
+    @Test
+    @DisplayName("外置快照缺少必需字段：回退内置快照")
+    void shouldFallBackWhenExternalCatalogMissingRequiredField() throws IOException {
+        Path external = tempDir.resolve("licenses.json");
+        Files.writeString(external, """
+                {
+                  "npm:lodash": {
+                    "name": "GNU GPL v3",
+                    "risk": "STRONG_COPYLEFT"
+                  }
+                }
+                """, StandardCharsets.UTF_8);
+
+        LicenseInfo info = new LicenseCatalog(external).lookup(
+                new Dependency("npm", "lodash", "4.17.21", "runtime"));
+
+        assertEquals("MIT", info.spdxId());
+        assertEquals(RiskLevel.PERMISSIVE, info.risk());
+    }
 }

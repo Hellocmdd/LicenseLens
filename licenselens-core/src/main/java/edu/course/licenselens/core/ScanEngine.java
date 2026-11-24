@@ -79,6 +79,10 @@ public class ScanEngine {
      * @throws SourceException 清单不存在、语法错误或没有解析器支持该格式
      */
     public ScanResult scan(Path manifest, String policyId, String format) throws SourceException {
+        if (!"markdown".equals(format) && !"json".equals(format)) {
+            throw new IllegalArgumentException("不支持的报告格式: " + format);
+        }
+
         // 1. 文件校验
         if (!Files.exists(manifest)) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
@@ -112,6 +116,9 @@ public class ScanEngine {
             } catch (RuntimeException e) {
                 System.err.println("WARN: 解析器 " + src.id()
                         + " 的 supports 抛异常（已跳过）: " + e.getMessage());
+            } catch (LinkageError e) {
+                System.err.println("WARN: 解析器 " + src.id()
+                        + " 的 supports 链接失败（已跳过）: " + e.getMessage());
             }
         }
         if (selected == null) {

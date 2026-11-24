@@ -103,17 +103,28 @@ public class LicenseCatalog {
         JSONObject root = new JSONObject(content);
         for (String key : root.keySet()) {
             JSONObject obj = root.getJSONObject(key);
-            String spdxId = obj.optString("spdxId", null);
-            String name = obj.optString("name", null);
-            String riskStr = obj.optString("risk", "UNKNOWN");
+            String spdxId = requiredString(obj, "spdxId");
+            String name = requiredString(obj, "name");
+            String riskStr = requiredString(obj, "risk");
             RiskLevel risk;
             try {
                 risk = RiskLevel.valueOf(riskStr);
             } catch (IllegalArgumentException e) {
-                risk = RiskLevel.UNKNOWN;
+                throw new JSONException("无效的 risk 值: " + riskStr);
             }
             map.put(key, new LicenseInfo(spdxId, name, risk));
         }
         return map;
+    }
+
+    private static String requiredString(JSONObject obj, String field) {
+        if (!obj.has(field) || obj.isNull(field)) {
+            throw new JSONException("缺少必需字段: " + field);
+        }
+        String value = obj.getString(field).trim();
+        if (value.isEmpty()) {
+            throw new JSONException("必需字段为空: " + field);
+        }
+        return value;
     }
 }

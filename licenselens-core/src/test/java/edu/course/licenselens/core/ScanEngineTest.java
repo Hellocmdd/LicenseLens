@@ -102,6 +102,28 @@ class ScanEngineTest {
     }
 
     @Test
+    @DisplayName("未知报告格式：抛出明确的参数错误")
+    void shouldRejectUnknownReportFormat() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> engine.scan(sample("demo-maven/pom.xml"), "campus", "markdownx"));
+
+        assertTrue(e.getMessage().contains("markdownx"));
+    }
+
+    @Test
+    @DisplayName("解析器探测抛出 LinkageError 时跳过该解析器")
+    void shouldSkipSourceWhenSupportsThrowsLinkageError() {
+        ScanEngine linkageEngine = new ScanEngine(new LicenseCatalog(),
+                List.of(new LinkageErrorSource()),
+                List.of(new CampusPolicy()));
+
+        SourceException e = assertThrows(SourceException.class,
+                () -> linkageEngine.scan(sample("demo-maven/pom.xml"), "campus"));
+
+        assertEquals(SourceException.Code.UNSUPPORTED_FORMAT, e.code());
+    }
+
+    @Test
     @DisplayName("T4 依赖名是 ${...} 占位符：保留原名，快照匹配不到按 UNKNOWN 计")
     void shouldCountPlaceholderNameAsUnknown() throws SourceException {
         ScanResult result = engine.scan(sample("edge/placeholder-pom.xml"), "campus");
@@ -164,6 +186,23 @@ class ScanEngineTest {
         @Override
         public List<Dependency> parse(Path file) {
             return List.of(new Dependency("stub", "stub:" + id, "1.0", "compile"));
+        }
+    }
+
+    private static final class LinkageErrorSource implements DependencySource {
+        @Override
+        public String id() {
+            return "linkage-error";
+        }
+
+        @Override
+        public boolean supports(ManifestRef ref) {
+            throw new NoClassDefFoundError("missing optional dependency");
+        }
+
+        @Override
+        public List<Dependency> parse(Path file) {
+            return List.of();
         }
     }
 }

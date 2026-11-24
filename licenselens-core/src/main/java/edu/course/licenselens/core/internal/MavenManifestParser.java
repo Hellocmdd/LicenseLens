@@ -152,7 +152,7 @@ public class MavenManifestParser implements DependencySource {
         NodeList depLists = doc.getElementsByTagName("dependencies");
         for (int i = 0; i < depLists.getLength(); i++) {
             Element depsContainer = (Element) depLists.item(i);
-            if (isInsideDependencyManagement(depsContainer)) {
+            if (isInsideDependencyManagement(depsContainer) || isInsideProfiles(depsContainer)) {
                 continue;
             }
 
@@ -209,6 +209,16 @@ public class MavenManifestParser implements DependencySource {
         for (Node parent = element.getParentNode(); parent != null; parent = parent.getParentNode()) {
             if (parent.getNodeType() == Node.ELEMENT_NODE
                     && "dependencyManagement".equals(parent.getNodeName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isInsideProfiles(Element element) {
+        for (Node parent = element.getParentNode(); parent != null; parent = parent.getParentNode()) {
+            if (parent.getNodeType() == Node.ELEMENT_NODE
+                    && "profiles".equals(parent.getNodeName())) {
                 return true;
             }
         }
