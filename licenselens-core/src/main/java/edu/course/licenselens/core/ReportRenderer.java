@@ -27,7 +27,7 @@ public class ReportRenderer {
             RiskLevel.UNKNOWN
     );
 
-    private static final Comparator<ScanRow> SORTER =
+    static final Comparator<ScanRow> SORTER =
             Comparator.comparingInt((ScanRow r) -> RISK_ORDER.indexOf(r.license().risk()))
                     .thenComparing(r -> r.dep().name());
 

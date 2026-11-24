@@ -66,6 +66,19 @@ public class ScanEngine {
      * @return 扫描结果（含退出码和报告）
      */
     public ScanResult scan(Path manifest, String policyId) throws SourceException {
+        return scan(manifest, policyId, "markdown");
+    }
+
+    /**
+     * 执行扫描并按指定格式生成报告。
+     *
+     * @param manifest 清单文件路径
+     * @param policyId 策略标识（"campus" 或 "permissive-only"）
+     * @param format   报告格式，"markdown" 或 "json"
+     * @return 扫描结果（含退出码和报告）
+     * @throws SourceException 清单不存在、语法错误或没有解析器支持该格式
+     */
+    public ScanResult scan(Path manifest, String policyId, String format) throws SourceException {
         // 1. 文件校验
         if (!Files.exists(manifest)) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
@@ -127,7 +140,9 @@ public class ScanEngine {
         }
 
         // 7. 生成报告
-        String report = renderer.render(rows, policy, manifest.toString());
+        String report = "json".equals(format)
+                ? new JsonReportRenderer().render(rows, policy, manifest.toString())
+                : renderer.render(rows, policy, manifest.toString());
 
         // 8. 计算退出码
         int exitCode = blockedCount > 0 ? 1 : 0;
