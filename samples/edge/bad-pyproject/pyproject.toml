@@ -1,0 +1,6 @@
+[project]
+name = "bad-demo"
+dependencies = [
+    "requests==2.31.0",
+    "not a valid requirement!",
+]

@@ -1,0 +1,3 @@
+# 语法错误样例：第 3 行不是合法的 conda 依赖
+dependencies:
+  - @@@invalid@@@
