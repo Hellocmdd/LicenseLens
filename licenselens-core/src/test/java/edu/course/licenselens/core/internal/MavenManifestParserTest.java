@@ -27,6 +27,9 @@ class MavenManifestParserTest {
 
     private final MavenManifestParser parser = new MavenManifestParser();
 
+    @TempDir
+    Path tempDir;
+
     @Test
     @DisplayName("T1 解析 demo-maven：4 条依赖，字段按契约填充")
     void shouldParseDemoMaven() throws SourceException {
@@ -137,6 +140,103 @@ class MavenManifestParserTest {
         assertEquals(1, deps.size());
         assertEquals("org.example:demo", deps.get(0).name());
         assertEquals("runtime", deps.get(0).scope());
+    }
+
+    @Test
+    @DisplayName("P2 父 POM：递归展开 <modules>，按坐标去重且忽略 dependencyManagement")
+    void shouldExpandModulesAndDeduplicate() throws IOException, SourceException {
+        writePom(tempDir.resolve("pom.xml"), """
+                <project>
+                  <modules>
+                    <module>a</module>
+                    <module>b</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>managed</groupId><artifactId>only</artifactId><version>9</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>shared</groupId><artifactId>dep</artifactId><version>1</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """);
+        writePom(tempDir.resolve("a/pom.xml"), """
+                <project>
+                  <dependencies>
+                    <dependency>
+                      <groupId>shared</groupId><artifactId>dep</artifactId><version>1</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>only</groupId><artifactId>in-a</artifactId><version>2</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """);
+        writePom(tempDir.resolve("b/pom.xml"), """
+                <project>
+                  <dependencies>
+                    <dependency>
+                      <groupId>only</groupId><artifactId>in-b</artifactId><version>3</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """);
+
+        List<Dependency> deps = parser.parse(tempDir.resolve("pom.xml"));
+
+        assertEquals(3, deps.size());
+        assertEquals(List.of("shared:dep", "only:in-a", "only:in-b"),
+                deps.stream().map(Dependency::name).toList());
+    }
+
+    @Test
+    @DisplayName("P2 模块互相引用：访问集合阻止无限递归")
+    void shouldStopWhenModulesFormCycle() throws IOException, SourceException {
+        writePom(tempDir.resolve("pom.xml"), """
+                <project>
+                  <modules><module>a</module></modules>
+                </project>
+                """);
+        writePom(tempDir.resolve("a/pom.xml"), """
+                <project>
+                  <modules><module>..</module></modules>
+                  <dependencies>
+                    <dependency>
+                      <groupId>only</groupId><artifactId>in-a</artifactId><version>2</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """);
+
+        List<Dependency> deps = parser.parse(tempDir.resolve("pom.xml"));
+
+        assertEquals(1, deps.size());
+        assertEquals("only:in-a", deps.get(0).name());
+    }
+
+    @Test
+    @DisplayName("P2 模块 POM 缺失：抛 PARSE_ERROR")
+    void shouldFailWhenModulePomMissing() throws IOException {
+        writePom(tempDir.resolve("pom.xml"), """
+                <project>
+                  <modules><module>missing</module></modules>
+                </project>
+                """);
+
+        SourceException error = assertThrows(SourceException.class,
+                () -> parser.parse(tempDir.resolve("pom.xml")));
+
+        assertEquals(SourceException.Code.PARSE_ERROR, error.code());
+    }
+
+    private static void writePom(Path file, String content) throws IOException {
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, content, StandardCharsets.UTF_8);
     }
 
     private static String firstLine(Path file) throws IOException {
