@@ -135,6 +135,49 @@ class MainTest {
         assertEquals(ExitCode.BLOCKED, code);
     }
 
+    @Test
+    @DisplayName("--format json：写出可解析的 JSON 报告且退出码不变")
+    void shouldWriteJsonReport(@TempDir Path tmp) throws IOException {
+        Path out = tmp.resolve("report.json");
+
+        ExitCode code = Main.run(new String[]{
+                "scan", "--manifest", sample("demo-maven/pom.xml").toString(),
+                "--format", "json", "--out", out.toString()
+        });
+
+        assertEquals(ExitCode.BLOCKED, code);
+        String content = Files.readString(out);
+        assertTrue(content.startsWith("{"), "JSON 报告应以 { 开头");
+        assertTrue(content.contains("\"result\": \"BLOCKED\""), "应包含判定结果");
+        assertTrue(content.contains("\"policy\": \"campus\""), "应包含策略");
+    }
+
+    @Test
+    @DisplayName("--format 非法：复用用法错误退出码 2")
+    void shouldRejectUnknownFormat(@TempDir Path tmp) {
+        ExitCode code = Main.run(new String[]{
+                "scan", "--manifest", sample("demo-maven/pom.xml").toString(),
+                "--format", "yaml", "--out", tmp.resolve("report.md").toString()
+        });
+
+        assertEquals(ExitCode.FILE_NOT_FOUND, code);
+    }
+
+    @Test
+    @DisplayName("--catalog：外置快照缺失时回退内置快照")
+    void shouldFallBackWhenCatalogMissing(@TempDir Path tmp) {
+        Path out = tmp.resolve("report.md");
+
+        ExitCode code = Main.run(new String[]{
+                "scan", "--manifest", sample("demo-maven/pom.xml").toString(),
+                "--catalog", tmp.resolve("missing.json").toString(),
+                "--out", out.toString()
+        });
+
+        assertEquals(ExitCode.BLOCKED, code);
+        assertTrue(Files.exists(out), "报告文件应被写出");
+    }
+
     private static Path sample(String relative) {
         return repoRoot().resolve("samples").resolve(relative);
     }
