@@ -3,6 +3,7 @@ package edu.course.licenselens.cli;
 import edu.course.licenselens.core.CampusPolicy;
 import edu.course.licenselens.core.LicenseCatalog;
 import edu.course.licenselens.core.PermissiveOnlyPolicy;
+import edu.course.licenselens.core.PolicyEngine;
 import edu.course.licenselens.core.ScanEngine;
 import edu.course.licenselens.core.ScanResult;
 import edu.course.licenselens.core.internal.MavenManifestParser;
@@ -85,11 +86,14 @@ public class Main {
         sources.addAll(new PluginLoader().loadAll(options.pluginsDir().toFile()));
 
         List<Policy> policies = List.of(new CampusPolicy(), new PermissiveOnlyPolicy());
-        if (policies.stream().noneMatch(p -> p.id().equals(options.policyId()))) {
-            return usageError("未知策略: " + options.policyId() + "，可选: " + policyIds(policies));
+        PolicyEngine policyEngine = new PolicyEngine(policies);
+        try {
+            policyEngine.select(options.policyId());
+        } catch (IllegalArgumentException e) {
+            return usageError(e.getMessage() + "，可选: " + policyIds(policies));
         }
 
-        ScanEngine engine = new ScanEngine(new LicenseCatalog(), sources, policies);
+        ScanEngine engine = new ScanEngine(new LicenseCatalog(), sources, policyEngine);
 
         try {
             ScanResult result = engine.scan(manifest, options.policyId());
@@ -102,7 +106,7 @@ public class Main {
                     options.policyId(), result.totalCount(),
                     result.blockedCount(), result.unknownCount());
 
-            return result.blockedCount() > 0 ? ExitCode.BLOCKED : ExitCode.OK;
+            return ExitCode.fromValue(result.exitCode());
 
         } catch (SourceException e) {
             return switch (e.code()) {

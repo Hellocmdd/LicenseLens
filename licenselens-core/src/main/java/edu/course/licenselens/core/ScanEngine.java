@@ -34,14 +34,26 @@ public class ScanEngine {
 
     private final LicenseCatalog catalog;
     private final List<DependencySource> sources;
-    private final List<Policy> policies;
+    private final PolicyEngine policyEngine;
 
+    /**
+     * 用策略列表构造扫描引擎，策略选择统一交给 {@link PolicyEngine}。
+     */
     public ScanEngine(LicenseCatalog catalog,
                       List<DependencySource> sources,
                       List<Policy> policies) {
+        this(catalog, sources, new PolicyEngine(policies));
+    }
+
+    /**
+     * 用策略引擎构造扫描引擎，便于 CLI 在扫描前复用同一份策略校验。
+     */
+    public ScanEngine(LicenseCatalog catalog,
+                      List<DependencySource> sources,
+                      PolicyEngine policyEngine) {
         this.catalog = catalog;
         this.sources = sources;
-        this.policies = policies;
+        this.policyEngine = policyEngine;
     }
 
     /**
@@ -94,11 +106,8 @@ public class ScanEngine {
         // 4. 解析依赖列表
         List<Dependency> deps = selected.parse(manifest);
 
-        // 5. 选策略
-        Policy policy = policies.stream()
-                .filter(p -> p.id().equals(policyId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("未知策略: " + policyId));
+        // 5. 选策略：统一走 PolicyEngine，避免与 CLI 各自实现一份选择逻辑
+        Policy policy = policyEngine.select(policyId);
 
         // 6. 逐条匹配许可证 + 策略判定
         ReportRenderer renderer = new ReportRenderer();
