@@ -16,7 +16,7 @@
     → 查许可证快照 → 策略判定 → 可核对的 Markdown 报告 + 退出码
 ```
 
-**基础能力**（内置于核心）：Maven `pom.xml` 解析、许可证快照匹配、`campus` 与 `permissive-only` 两种策略、Markdown 报告、CLI 入口与退出码。
+**基础能力**（内置于核心）：Maven `pom.xml` 解析（递归展开 `<modules>` 并按依赖四元组去重）、许可证快照匹配、`campus` 与 `permissive-only` 两种策略、Markdown 报告、CLI 入口与退出码。
 
 **扩展新增能力**：通过独立 jar 接入新的清单格式。npm `package-lock.json`（v1/v2/v3）与 Go `go.mod` 均已实现并合入 `master`；Python `requirements.txt` 支持在本分支新增（31 个契约测试）。插件 POM 可单独构建；根 reactor 的 `distribution` 模块会自动把 CLI 与所有插件 jar 装配到 `distribution/target/dist/`，无需手工复制，核心源码无需改动。
 
@@ -143,7 +143,7 @@ java -jar licenselens-cli.jar scan \
 
 CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上执行 `mvn -B clean verify`；该命令已覆盖核心、插件与装配模块。装配后还有一步 smoke：断言四种样例在默认 `./plugins` 下的退出码与终端摘要（T7），并在移走 `plugins/` 后断言三种扩展清单返回 4、内置 Maven 样例仍可用（T8）。`.github/workflows/ci-npm-plugin.yml`、`.github/workflows/ci-go-plugin.yml` 与 `.github/workflows/ci-python-plugin.yml` 分别仅在 `feat/npm-parser`、`feat/go-parser`、`feat/python-plugin` 分支的 push / PR 触发，单独验证对应扩展；`.github/workflows/release.yml` 在 `v*` Tag 触发双平台打包。本地命令序列见“快速开始”；远端真实运行记录以 GitHub Actions 页面为准。
 
-测试已就位：根目录 `mvn -B clean verify` 运行 165 个用例（core 41 + cli 14 + npm 39 + Go 40 + Python 31），覆盖核心链路、三种扩展与插件加载错误路径；同时产出可直接运行的 `distribution/target/dist/`。T7/T8 现由 CI smoke 步骤在双平台自动覆盖，不再只靠手工验证：装配目录内扫描四种样例均能发现对应插件，Maven 样例因阻断依赖返回 1，其余返回 0；移走 `plugins/` 后三种扩展清单返回 4。JUnit 层的 CLI 集成测试模块仍待补。实际执行结果：一条 `BUILD SUCCESS`，165 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
+测试已就位：根目录 `mvn -B clean verify` 运行 168 个用例（core 44 + cli 14 + npm 39 + Go 40 + Python 31），覆盖核心链路、Maven 模块展开、三种扩展与插件加载错误路径；同时产出可直接运行的 `distribution/target/dist/`。T7/T8 现由 CI smoke 步骤在双平台自动覆盖，不再只靠手工验证：装配目录内扫描四种样例均能发现对应插件，Maven 样例因阻断依赖返回 1，其余返回 0；移走 `plugins/` 后三种扩展清单返回 4。JUnit 层的 CLI 集成测试模块仍待补。实际执行结果：一条 `BUILD SUCCESS`，168 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
 
 ## 协作与贡献入口
 
@@ -163,4 +163,4 @@ CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时�
 
 项目采用 MIT License，理由：课程作业以开放协作为目标，MIT 条款简单、对依赖方限制最少。关键依赖：`org.json`（core 解析 `licenses.json`）、JUnit（测试）与 Maven 插件，均按其各自许可证使用，未在仓库中捆绑第三方二进制；`org.json` 的许可证条款（JSON License 及其历史附加条款）需在发布前核对。
 
-已知限制：`supports()` 对 npm 只认精确文件名 `package-lock.json`，对 Go 只认 `go.mod`，对 Python 认文件名含 `requirement` 的 `.txt/.in/.pip`，`*.v1.json`、`go.single-require.mod` 等 fixture 供契约测试使用，手工演示需复制改名；`licenses.json` 收录 54 条，按 `ecosystem:name` 精确匹配并回退纯名称，未命中才为 `UNKNOWN`；参数错误复用退出码 `2`，契约暂无“用法错误”一档；报告含生成时间，同一输入输出排序确定但字节不一致，跨平台路径分隔符也不同；`PolicyEngine.select()` 已实现，但 `ScanEngine` 仍内联策略选择，未接入该类；T7 CLI 集成测试待补；`docs/DESIGN.docx` 已随工程提交，`release/RELEASE.md` 尚未完成。当前版本可对 Maven、npm、Go、Python 清单产出审计报告，不覆盖传递依赖分析、联网查询与源码扫描。
+已知限制：`supports()` 对 npm 只认精确文件名 `package-lock.json`，对 Go 只认 `go.mod`，对 Python 认文件名含 `requirement` 的 `.txt/.in/.pip`，`*.v1.json`、`go.single-require.mod` 等 fixture 供契约测试使用，手工演示需复制改名；`licenses.json` 收录 54 条，按 `ecosystem:name` 精确匹配并回退纯名称，未命中才为 `UNKNOWN`；参数错误复用退出码 `2`，契约暂无“用法错误”一档；报告含生成时间，同一输入输出排序确定但字节不一致，跨平台路径分隔符也不同；Maven 解析器会递归展开 `<modules>` 并按依赖四元组去重，但不解析继承、属性占位符或 `<profiles>`，也不做传递依赖分析；T7/T8 的行为由 CI smoke 覆盖，JUnit 层 CLI 集成测试仍待补；`docs/DESIGN.docx` 已随工程提交，`release/RELEASE.md` 尚未完成。当前版本可对 Maven、npm、Go、Python 清单产出审计报告，不覆盖传递依赖分析、联网查询与源码扫描。
