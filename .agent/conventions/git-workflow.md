@@ -27,9 +27,9 @@
 - 提交前本地跑通对应命令，测试不过不许继续叠加提交。
 
 ```powershell
-mvn -B compile                                  # 编译
-mvn -B test -pl licenselens-core,licenselens-cli # 核心与 CLI 测试
-mvn -B test -f plugins/licenselens-npm/pom.xml   # 扩展测试（按需）
+mvn -B clean verify                              # 全模块构建、测试与装配
+mvn -B test -pl licenselens-core,licenselens-cli # 仅核心与 CLI 测试
+mvn -B test -f plugins/licenselens-npm/pom.xml   # 扩展单独测试（需先安装 parent 与 spi）
 mvn -B checkstyle:check                          # 已接入 Checkstyle 后必跑
 ```
 

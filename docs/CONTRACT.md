@@ -13,7 +13,7 @@
 package edu.course.licenselens.spi;
 
 public interface DependencySource {
-    String id();                          // "maven" / "npm"
+    String id();                          // 如 "maven" / "npm" / "go" / "python"
     boolean supports(ManifestRef ref);    // 文件名 + 首行特征判断
     List<Dependency> parse(Path file) throws SourceException;
 }
@@ -96,7 +96,7 @@ CLI 根据以下退出码在 main 中 `System.exit(code)`。
 | 0 | 正常，无阻断依赖 | 一切 OK |
 | 1 | 存在阻断依赖 | 策略判定结果 |
 | 2 | 清单文件不存在 | CLI 参数校验 / SourceException.FILE_NOT_FOUND |
-| 3 | XML/JSON 语法错误 | SourceException.PARSE_ERROR |
+| 3 | 清单语法错误（XML / JSON / 文本） | SourceException.PARSE_ERROR |
 | 4 | 无可用解析器 | 所有 DependencySource.supports() 返回 false |
 
 ---
@@ -106,9 +106,9 @@ CLI 根据以下退出码在 main 中 `System.exit(code)`。
 | 场景 | 抛出 | CLI 处理 | 退出码 |
 | --- | --- | --- | --- |
 | 清单路径不存在 | SourceException(FILE_NOT_FOUND) | 打印路径，终止 | 2 |
-| XML/JSON 语法错误 | SourceException(PARSE_ERROR, line=N) | 打印行号 + 消息，终止 | 3 |
+| 清单语法错误（XML / JSON / 文本） | SourceException(PARSE_ERROR, line=N) | 打印行号 + 消息，终止 | 3 |
 | 所有解析器 supports=false | 无异常 | 提示安装插件，终止 | 4 |
-| 插件 jar 加载失败 | 运行时异常 | 打印插件名 + 跳过，继续扫描 | 0（降级） |
+| 插件 jar 加载失败 | 运行时异常 | 打印插件名 + 跳过，继续扫描 | 不改变退出码（由策略判定决定） |
 | 依赖未命中许可证快照 | 无异常 | LicenseCatalog 返回 UNKNOWN 占位 | 0 或 1（取决于策略） |
 | 策略判定存在阻断 | 无异常 | 报告含阻断行，CLI 返回 1 | 1 |
 
@@ -143,3 +143,4 @@ CLI 根据以下退出码在 main 中 `System.exit(code)`。
 | 日期 | 变更 | 影响 | 审批 |
 | --- | --- | --- | --- |
 | 2026-11-17 | v1 初始冻结 | 所有接口签名、退出码表、错误契约 | A/B/C 全员签字 |
+| 2026-11-23 | 澄清性修正：解析器 id 示例覆盖四类生态；退出码 3 场景改为“清单语法错误”；插件加载失败不再写死退出码 0 | 仅修正描述，不改变接口签名、退出码数值或错误契约行为 | 待全员 Review |

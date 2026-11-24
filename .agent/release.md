@@ -6,14 +6,13 @@
 
 ```text
 1. 全部 PR 已合并，无未完成的功能分支
-2. mvn -B clean verify 通过（含核心 reactor 与两个扩展各自构建）
-3. 演示命令实跑通过（npm 场景先构建并复制插件 jar）：
-   java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-maven/pom.xml
-   java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-maven/pom.xml --policy permissive-only
-   cp plugins/licenselens-npm/target/licenselens-npm-0.1.0-SNAPSHOT.jar plugins/
-   java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-npm/package-lock.json --plugins plugins
-   cp plugins/licenselens-go/target/licenselens-go-0.1.0-SNAPSHOT.jar plugins/
-   java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-go/go.mod --plugins plugins
+2. mvn -B clean verify 通过（含核心、三个插件与 distribution 装配）
+3. 演示命令实跑通过（在 distribution/target/dist/ 执行，插件 jar 已自动装配）：
+   java -jar licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml
+   java -jar licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml --policy permissive-only
+   java -jar licenselens-cli.jar scan --manifest samples/demo-npm/package-lock.json
+   java -jar licenselens-cli.jar scan --manifest samples/demo-go/go.mod
+   java -jar licenselens-cli.jar scan --manifest samples/demo-python/requirements.txt
 4. README 的构建/运行命令与当前产物名一致，无占位符
 5. git status 干净
 ```

@@ -69,7 +69,7 @@
 - `plugins/*`：`pom.xml` 只依赖 `licenselens-spi`（JUnit 为 test 范围），不得依赖 `licenselens-core` / `licenselens-cli`；源码不得 import 这两个包。
 - 扩展不复制 core 的策略、渲染或快照逻辑；扩展只做"清单 → `List<Dependency>`"。
 - core 不得反向依赖任何 `plugins/*`；内置 Maven 解析器通过构造注入，不走 ServiceLoader。
-- 依赖方向固定：`cli → core → spi`，`plugins → spi`。
+- 依赖方向固定：`cli → core → spi`，`plugins → spi`；`distribution → cli / plugins` 仅用于装配，不被核心或插件反向依赖。
 
 ## 8. 测试代码
 
@@ -82,7 +82,7 @@
 
 ## 9. 风格检查
 
-- 当前强制门禁是 `mvn -B clean verify`（编译 + 测试 + Checkstyle）。提交前必须本地通过。
+- 当前强制门禁是 `mvn -B clean verify`（编译 + 测试 + Checkstyle + `distribution` 装配）。提交前必须本地通过。
 - Checkstyle 已接入 `verify` 阶段，规则集为 `config/checkstyle/checkstyle.xml`（按代码风格约束落的最小集合；L08 原件未提供，拿到后替换）。必须零告警，禁止用 suppression 文件绕过。
 - 出现风格告警时优先改代码，不改规则；确需调整规则时单独提交并说明原因。
 

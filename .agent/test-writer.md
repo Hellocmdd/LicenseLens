@@ -14,7 +14,7 @@
 | T6 | 清单语法错误 | core + cli | `PARSE_ERROR` 且 `line() > 0`；退出码 3 |
 | T7 | 扩展接入后生效：jar 放入插件目录被自动发现 | cli 集成测试（待补） | 新格式清单能解析出预期依赖；退出码按判定结果 |
 | T8 | 移走扩展后无可用解析器 | cli 集成测试 | 退出码 4；提示安装插件；不抛未捕获异常 |
-| T9 | 扩展契约：只依赖 spi 验证输入输出与错误码 | `plugins/*/src/test` | npm 39 例 + Go 40 例已覆盖 `id()`、`supports()`、`parse()` 与 `SourceException` 码 |
+| T9 | 扩展契约：只依赖 spi 验证输入输出与错误码 | `plugins/*/src/test` | npm 39 例 + Go 40 例 + Python 31 例已覆盖 `id()`、`supports()`、`parse()` 与 `SourceException` 码 |
 
 - T1–T6 由 core/cli 侧维护；T9 由扩展侧维护，**不得依赖 core**；T7 集成用例待补，T8 由 core/cli 测试覆盖。
 - 同一用例可以覆盖多类行为，但矩阵里的每一项都要有对应用例；不要用"一个超级测试"覆盖全部。
@@ -47,13 +47,14 @@
 ## 5. 运行命令
 
 ```bash
-mvn -B test -pl licenselens-core,licenselens-cli            # 核心与 CLI
-mvn -B test -f plugins/licenselens-npm/pom.xml              # npm 扩展（需先安装 parent 与 spi）
-mvn -B test -f plugins/licenselens-go/pom.xml               # go 扩展
-mvn -B clean verify                                          # 全量
+mvn -B clean verify                                          # 全模块构建、测试与装配
+mvn -B test -pl licenselens-core,licenselens-cli            # 仅核心与 CLI
+mvn -B test -f plugins/licenselens-npm/pom.xml              # npm 扩展单独测试
+mvn -B test -f plugins/licenselens-go/pom.xml               # Go 扩展单独测试
+mvn -B test -f plugins/licenselens-python/pom.xml           # Python 扩展单独测试
 ```
 
-- 独立 reactor 的扩展要先 `mvn -B -N install -DskipTests` 和 `mvn -B -pl licenselens-spi install -DskipTests`，否则解析不到 spi 依赖。
+- 单独构建扩展时才需要先 `mvn -B -N install -DskipTests` 和 `mvn -B -pl licenselens-spi install -DskipTests`；根 reactor 构建不需要手工安装或复制 jar。
 - 测试不联网、不依赖本地 Maven 仓库之外的私有产物。
 
 ## 6. 禁止

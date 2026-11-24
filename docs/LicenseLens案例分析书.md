@@ -88,8 +88,8 @@
 | FR-4 | 输出 Markdown 报告文件 | 必须 | 文件存在且内容逐行比对 |
 | FR-5 | 终端摘要与退出码 | 必须 | 5 种退出码（0/1/2/3/4）分别可复现 |
 | FR-6 | 未知许可证标记为 UNKNOWN 并汇总 | 必须 | 虚构 artifact 用例 |
-| FR-7 | 支持外部解析器插件（目录加载） | 必须 | 放入 npm 插件后生效 |
-| FR-8 | 支持第二种生态（npm） | 必须（扩展） | 扫 package-lock.json 成功 |
+| FR-7 | 支持外部解析器插件（目录加载） | 必须 | `distribution` 装配插件后生效，移走后返回 4 |
+| FR-8 | 支持多生态扩展（npm / Go / Python） | 必须（扩展） | 扫 package-lock.json / go.mod / requirements.txt 成功 |
 | FR-9 | 多清单批量扫描 | 可选 | 未实现则写入限制 |
 
 ### 3.2 非功能需求
@@ -106,7 +106,7 @@
 ### 3.3 范围边界（写进 README）
 
 ```text
-本次实现：Maven 清单解析、许可证快照匹配、两种策略、Markdown 报告、npm 扩展（已合入）、Go 扩展（已合入）
+本次实现：Maven 清单解析、许可证快照匹配、两种策略、Markdown 报告、npm 扩展、Go 扩展、Python 扩展
 本次不做：传递依赖、联网查询、SBOM 导出、源码扫描、GUI、插件市场、热加载
 ```
 
@@ -163,8 +163,10 @@ licenselens/
 ├─ licenselens-core/            # 核心实现 + Maven 解析器 + licenses.json
 ├─ licenselens-cli/             # 入口，打可执行 jar
 ├─ plugins/
-│  ├─ licenselens-npm/          # 独立扩展：v1/v2/v3 已实现，不属于 parent reactor
-│  └─ licenselens-go/           # 独立扩展：go.mod 解析已实现，不属于 parent reactor
+│  ├─ licenselens-npm/          # 独立扩展：v1/v2/v3 已实现，随根 reactor 构建
+│  ├─ licenselens-go/           # 独立扩展：go.mod 解析已实现，随根 reactor 构建
+│  └─ licenselens-python/       # 独立扩展：requirements.txt 解析已实现，随根 reactor 构建
+├─ distribution/                # 统一装配 CLI 与插件 jar 到 target/dist/
 ├─ samples/
 │  ├─ demo-maven/pom.xml
 │  ├─ demo-npm/package-lock.json
@@ -185,7 +187,7 @@ licenselens/
 | --- | --- |
 | 契约单独成模块 | 扩展只依赖它，编译期就阻止越界引用核心 |
 | 内置 Maven 解析器放在 core | 它是基础能力，不要求做成插件 |
-| 插件目录与 reactor 分离 | 扩展可独立构建、独立发布，验证"核心不改" |
+| 插件 POM 与核心解耦 | 插件仍只依赖 spi、可单独构建；根 reactor 的 `distribution` 统一装配，验证"核心不改" |
 | CLI 与 core 分离 | CLI 只做参数与输出，便于对 core 做单元测试 |
 
 ---
@@ -419,9 +421,9 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 | T4 | 边界 | 依赖名含 `$` 占位符 | 保留原样并标记 UNKNOWN | 非预期输入 |
 | T5 | 失败 | 不存在的路径 | 退出码 2，提示含路径 | 错误反馈 |
 | T6 | 失败 | 损坏的 XML（`samples/edge/bad-pom.xml`） | 退出码 3，提示含行号（实测第 15 行附近） | 错误定位 |
-| T7 | 扩展 | 放入已构建的 npm 插件 jar，扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；CLI 级集成用例待补 | 扩展接入（计划） |
-| T8 | 扩展 | 移走 npm 插件后扫同一文件 | 退出码 4，提示安装插件 | 降级行为 |
-| T9 | 扩展 | npm 39 例 + Go 40 例（不依赖 core） | 解析结果字段、错误码与发现规则正确 | 契约稳定性（两个扩展均已覆盖） |
+| T7 | 扩展 | `distribution` 装配后扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；CLI 级集成用例待补 | 扩展接入（计划） |
+| T8 | 扩展 | 移走插件 jar 后扫同一文件 | 退出码 4，提示安装插件 | 降级行为 |
+| T9 | 扩展 | npm 39 例 + Go 40 例 + Python 31 例（不依赖 core） | 解析结果字段、错误码与发现规则正确 | 契约稳定性（三个扩展均已覆盖） |
 
 ### 10.2 故意改错演示
 
@@ -479,9 +481,9 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 | 项 | 内容 |
 | --- | --- |
 | 版本 | 0.1.0（首个可用版本） |
-| 制品 | `licenselens-0.1.0.zip`：cli jar + npm 插件 jar + samples + 启动脚本 |
+| 制品 | `licenselens-0.1.0.zip`：cli jar + npm / Go / Python 插件 jar + samples + 启动脚本 |
 | 环境 | JDK 21，无需 IDE |
-| 运行 | `java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan --manifest samples/demo-maven/pom.xml`（发布版以 `RELEASE.md` 中记录的产物名为准） |
+| 运行 | `mvn -B clean verify` 后在 `distribution/target/dist/` 执行 `java -jar licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml`（发布版以 `RELEASE.md` 中记录的产物名为准） |
 
 ### 12.2 发布步骤
 
@@ -527,7 +529,7 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | --- | --- | --- |
 | 一个核心场景 | `scan` 一条命令 → 报告 + 退出码 | 演示脚本 |
 | 一种扩展机制 + 一个独立扩展 | `DependencySource` SPI + npm 插件 | 插件 jar + `git log` 证明核心未改 |
-| 有效测试 | 9 个用例覆盖三类行为 | 测试报告 |
+| 有效测试 | 161 个用例覆盖三类行为 | 测试报告 |
 | 基础质量控制 | Checkstyle + CI | CI 运行记录 |
 | 真实协作 | 每人一个 PR + 一次实质 Review | README 协作表 |
 | 可追溯发布 | 附注 Tag + SHA-256 | RELEASE.md |
@@ -541,7 +543,7 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | --- | --- | --- |
 | 1 | `licenselens scan --manifest samples/demo-maven/pom.xml` | 展示 4 行报告与风险排序 |
 | 2 | 加 `--policy permissive-only` | 同一输入判定变化，退出码 1 |
-| 3 | 先构建 npm 插件 jar 放入 `plugins/`，再扫 `package-lock.json` | 新生态生效，核心零改动 |
+| 3 | `mvn -B clean verify` 生成装配目录后，在 `distribution/target/dist/` 扫 `package-lock.json` | 插件自动装配，新生态生效，核心零改动 |
 | 4 | 移走插件后重跑 | 退出码 4，提示安装解析器 |
 | 5 | 把 `samples/edge/bad-lock.json` 复制为 `package-lock.json` 后扫描 | 退出码 3，提示第 8 行附近；原名返回 4 |
 | 6 | 改一行排序代码 → 测试红 → 恢复 → 绿 | 证明测试有效 |
@@ -552,7 +554,7 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 
 | 问题 | 回答要点 |
 | --- | --- |
-| 许可证数据准确吗？ | 课程级快照当前 4 条 Maven 坐标（规划 40 条未达成）；未知一律 UNKNOWN；README 声明非法律意见；快照可替换 |
+| 许可证数据准确吗？ | 课程级快照当前 54 条，覆盖 Maven / npm / Go / Python；按 `ecosystem:name` 精确匹配并回退纯名称，未命中才为 UNKNOWN；README 声明非法律意见；快照可替换 |
 | 这跟依赖检查工具有什么区别？ | 统一模型 + 可插拔生态适配；新增生态只写一个类，核心零改动 |
 | 为什么不做传递依赖？ | 需要依赖树与版本仲裁，超出课程范围；明确声明限制优于不准确 |
 | 怎么证明扩展独立？ | 扩展 pom 只依赖 spi；开发期间作者未读 core；`git log` 显示接入无核心提交 |
@@ -561,7 +563,7 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | 契约变更怎么处理？ | 记录在 CONTRACT.md，新增默认方法兼容；字段变更升主版本并公告 |
 | 报告为什么排序？ | 保证同一输入输出排序一致，便于测试与 diff；报告含生成时间，字节不完全一致 |
 | 覆盖率多少？ | 不追求数字；以三类行为的断言覆盖为准，故意改错能被测试发现 |
-| 你们的已知限制？ | 声明层、离线快照（4 条 Maven 坐标）、两个扩展都需构建 jar 才能被 CLI 发现、T7 集成测试待补、无 SBOM、非法律意见 |
+| 你们的已知限制？ | 声明层、离线快照（54 条，未命中按 UNKNOWN）、T7 集成测试待补、无 SBOM、非法律意见 |
 
 ---
 

@@ -34,7 +34,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      # Go 插件是独立 reactor，先安装 parent 与 spi 到本地仓库。
+      # Go 插件是独立模块，单独构建前先安装 parent 与 spi 到本地仓库。
       # 用 working-directory 而非 cd && ...，保证 Ubuntu / PowerShell 通用。
       - name: Install parent + SPI
         run: |

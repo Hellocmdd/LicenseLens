@@ -18,7 +18,7 @@
 
 **基础能力**（内置于核心）：Maven `pom.xml` 解析、许可证快照匹配、`campus` 与 `permissive-only` 两种策略、Markdown 报告、CLI 入口与退出码。
 
-**扩展新增能力**：通过独立 jar 接入新的清单格式。npm `package-lock.json`（v1/v2/v3）与 Go `go.mod` 均已实现并合入 `master`；Python `requirements.txt` 支持在本分支新增（31 个契约测试）。先独立构建插件 jar，再把 jar 放入 `--plugins` 指定的目录（默认 `./plugins`）即可启用，核心源码无需改动。
+**扩展新增能力**：通过独立 jar 接入新的清单格式。npm `package-lock.json`（v1/v2/v3）与 Go `go.mod` 均已实现并合入 `master`；Python `requirements.txt` 支持在本分支新增（31 个契约测试）。插件 POM 可单独构建；根 reactor 的 `distribution` 模块会自动把 CLI 与所有插件 jar 装配到 `distribution/target/dist/`，无需手工复制，核心源码无需改动。
 
 **本次不做**：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容。许可证快照为课程级数据，结论不构成法律意见。
 
@@ -33,52 +33,54 @@
 以下命令在**项目根目录**执行：
 
 ```bash
-# 构建核心 reactor（spi / core / cli）
+# 一条命令构建全部模块，并自动装配可运行目录
 mvn -B clean verify
+```
 
-# 独立构建 npm 扩展（先安装 parent 与 spi）
-mvn -B -N install -DskipTests
-mvn -B -pl licenselens-spi install -DskipTests
+产物位于 `distribution/target/dist/`：
+
+```text
+distribution/target/dist/
+├── licenselens-cli.jar
+├── plugins/
+│   ├── licenselens-npm.jar
+│   ├── licenselens-go.jar
+│   └── licenselens-python.jar
+├── samples/
+├── README.md
+└── LICENSE
+```
+
+插件 POM 仍可单独构建，例如只验证 npm 扩展：
+
+```bash
 mvn -B -f plugins/licenselens-npm/pom.xml clean verify
-cp plugins/licenselens-npm/target/licenselens-npm-0.1.0-SNAPSHOT.jar plugins/
 ```
 
-Go 扩展同样是独立 reactor，已实现 `go.mod` 解析并有 40 个契约测试：
+单独构建只会把 jar 产在对应模块的 `target/`，不会更新 `distribution/target/dist/`；如需单独验证，请用 `--plugins plugins/licenselens-npm/target` 或手动放入插件目录。
+
+CLI 用法（以下命令在 `distribution/target/dist/` 下执行）：
 
 ```bash
-mvn -B -f plugins/licenselens-go/pom.xml clean verify
-cp plugins/licenselens-go/target/licenselens-go-0.1.0-SNAPSHOT.jar plugins/
-```
+cd distribution/target/dist
 
-Python 扩展解析 `requirements.txt`，31 个契约测试：
-
-```bash
-mvn -B -f plugins/licenselens-python/pom.xml clean verify
-cp plugins/licenselens-python/target/licenselens-python-0.1.0-SNAPSHOT.jar plugins/
-```
-
-CLI 用法（以下命令在**项目根目录**执行）：
-
-```bash
 # 默认 campus 策略：GPL-2.0 依赖被判阻断，退出码 1
-java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
+java -jar licenselens-cli.jar scan \
   --manifest samples/demo-maven/pom.xml --out report.md
 
 # 换 permissive-only：弱 copyleft 也被阻断
-java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
+java -jar licenselens-cli.jar scan \
   --manifest samples/demo-maven/pom.xml --policy permissive-only --out report.md
 
-# npm 扩展：先按上文把插件 jar 放入 plugins/，再扫描 lockfile
-java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
-  --manifest samples/demo-npm/package-lock.json --plugins plugins --out report.md
+# npm / Go / Python 插件 jar 已在 ./plugins，无需手工复制
+java -jar licenselens-cli.jar scan \
+  --manifest samples/demo-npm/package-lock.json --out report.md
 
-# Go 扩展：同样先放入插件 jar，再扫描 go.mod
-java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
-  --manifest samples/demo-go/go.mod --plugins plugins --out report.md
+java -jar licenselens-cli.jar scan \
+  --manifest samples/demo-go/go.mod --out report.md
 
-# Python 扩展：扫描 requirements.txt
-java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
-  --manifest samples/demo-python/requirements.txt --plugins plugins --out report.md
+java -jar licenselens-cli.jar scan \
+  --manifest samples/demo-python/requirements.txt --out report.md
 ```
 
 终端摘要是一行，便于从 CI 日志里定位结果：
@@ -87,7 +89,7 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
 策略: campus | 依赖数: 4 | 阻断: 1 | 未知: 0
 ```
 
-扫描 npm 样例时摘要形如 `策略: campus | 依赖数: 1 | 阻断: 0 | 未知: 1`；扫描 Go 样例时摘要形如 `策略: campus | 依赖数: 6 | 阻断: 0 | 未知: 6`；扫描 Python 样例时摘要形如 `策略: campus | 依赖数: 3 | 阻断: 0 | 未知: 3`。许可证快照只收录 Maven 坐标，npm / Go / Python 依赖均按 `UNKNOWN` 处理。
+扫描 npm 样例时摘要形如 `策略: campus | 依赖数: 1 | 阻断: 0 | 未知: 0`；扫描 Go 样例时摘要形如 `策略: campus | 依赖数: 6 | 阻断: 0 | 未知: 4`；扫描 Python 样例时摘要形如 `策略: campus | 依赖数: 3 | 阻断: 0 | 未知: 0`。许可证快照按 `ecosystem:name` 精确匹配，未命中回退纯名称，最后才按 `UNKNOWN` 处理；当前收录 54 条，覆盖 Maven / npm / Go / Python。
 
 报告写到 `--out` 指定的路径（默认 `./report.md`），其中按风险降序、同风险按名称升序列出每个依赖的许可证、判定与理由。
 
@@ -109,8 +111,9 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
 | `plugins/licenselens-npm` | 独立扩展：npm `package-lock.json` v1/v2/v3 解析（已合入 `master`）                | B                          |
 | `plugins/licenselens-go`  | 独立扩展：Go `go.mod` 解析（已合入 `master`，40 个契约测试）                     | B                          |
 | `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` 解析（本分支新增，31 个契约测试）            | C                          |
+| `distribution`            | 统一装配 CLI 与插件 jar 到 `target/dist/`，供本地运行和发布打包复用                | C                          |
 
-扩展只依赖 `licenselens-spi`，pom 中不得出现 `licenselens-core`。接入方式：在扩展 jar 的 `META-INF/services/edu.course.licenselens.spi.DependencySource` 中声明实现类全限定名，将构建好的 jar 直接放入 `--plugins` 指定目录（只扫描该目录下的一级 `*.jar`）；禁用则移走 jar。CLI 每次运行都重新加载插件目录，无需重启；插件加载器在 JVM 退出时统一关闭。核验“核心源码不变”的方法：对比接入前后 `licenselens-core/` 与 `licenselens-cli/` 的 Git 历史，应无改动。
+扩展只依赖 `licenselens-spi`，pom 中不得出现 `licenselens-core`。接入方式：在扩展 jar 的 `META-INF/services/edu.course.licenselens.spi.DependencySource` 中声明实现类全限定名，并把 jar 放入 `--plugins` 指定目录（只扫描该目录下的一级 `*.jar`）；根 reactor 的 `distribution` 模块会自动完成这一步。禁用则移走 jar。CLI 每次运行都重新加载插件目录，无需重启；插件加载器在 JVM 退出时统一关闭。核验“核心源码不变”的方法：对比接入前后 `licenselens-core/` 与 `licenselens-cli/` 的 Git 历史，应无改动。
 
 接口契约、注册规则、错误约定与兼容策略见 `docs/CONTRACT.md`。
 
@@ -136,11 +139,11 @@ java -jar licenselens-cli/target/licenselens-cli-0.1.0-SNAPSHOT.jar scan \
 
 ## 测试与检查
 
-构建即检查：`mvn -B clean verify` 同时执行编译、测试与 Checkstyle（`verify` 阶段绑定 `maven-checkstyle-plugin:check`）。规则集在 `config/checkstyle/checkstyle.xml`，依据项目代码风格硬约束落的最小集合；课程 L08 原始规则集未随仓库提供，拿到后以 L08 为准替换并单独说明。四个 reactor（parent、npm、Go、Python）共用这份规则集，独立插件通过 `../../config/checkstyle/checkstyle.xml` 引用。检测到告警即构建失败，不使用 suppression 绕过。
+构建即检查：`mvn -B clean verify` 现在构建全部 8 个模块（parent、spi、core、cli、三个插件与 `distribution`），同时执行编译、测试与 Checkstyle（`verify` 阶段绑定 `maven-checkstyle-plugin:check`）。规则集在 `config/checkstyle/checkstyle.xml`，依据项目代码风格硬约束落的最小集合；课程 L08 原始规则集未随仓库提供，拿到后以 L08 为准替换并单独说明。插件 POM 仍通过 `../../config/checkstyle/checkstyle.xml` 引用，`distribution` 无源码故跳过 Checkstyle。检测到告警即构建失败，不使用 suppression 绕过。
 
-CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上分别构建核心 reactor、安装 parent+spi、独立构建 npm、Go 与 Python 扩展；上述 `verify` 会同时触发各 reactor 的 Checkstyle。`.github/workflows/ci-npm-plugin.yml`、`.github/workflows/ci-go-plugin.yml` 与 `.github/workflows/ci-python-plugin.yml` 分别仅在 `feat/npm-parser`、`feat/go-parser`、`feat/python-plugin` 分支的 push / PR 触发，单独验证对应扩展；`.github/workflows/release.yml` 在 `v*` Tag 触发双平台打包。本地命令序列见“快速开始”；远端真实运行记录以 GitHub Actions 页面为准。
+CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上执行 `mvn -B clean verify`；该命令已覆盖核心、插件与装配模块。`.github/workflows/ci-npm-plugin.yml`、`.github/workflows/ci-go-plugin.yml` 与 `.github/workflows/ci-python-plugin.yml` 分别仅在 `feat/npm-parser`、`feat/go-parser`、`feat/python-plugin` 分支的 push / PR 触发，单独验证对应扩展；`.github/workflows/release.yml` 在 `v*` Tag 触发双平台打包。本地命令序列见“快速开始”；远端真实运行记录以 GitHub Actions 页面为准。
 
-测试已就位：根目录 `mvn -B clean verify` 运行 39 个用例（`licenselens-core` 29 个、`licenselens-cli` 10 个），覆盖 T1–T6、T8 与 CLI 参数/退出码；npm 扩展单独 `mvn -B -f plugins/licenselens-npm/pom.xml clean verify` 运行 39 个 T9 契约用例，覆盖 v1/v2/v3、字段填充、错误码与 `ServiceLoader` 发现；Go 扩展单独 `mvn -B -f plugins/licenselens-go/pom.xml clean verify` 运行 40 个 T9 契约用例，覆盖 require 块、单行 require、`/vN` 主版本、空清单与错误契约；Python 扩展单独 `mvn -B -f plugins/licenselens-python/pom.xml clean verify` 运行 31 个 T9 契约用例，覆盖固定版本、范围约束、extras、环境标记、注释/选项行、续行、dev scope 与错误契约。T7（CLI 放入/移走插件的端到端集成）仍待补，本分支已手工验证放入插件后扫描 `requirements.txt` 返回 0、不放入返回 4、语法错误返回 3。实际执行结果：四个命令均 `BUILD SUCCESS`，测试 39 + 39 + 40 + 31 = 149 全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
+测试已就位：根目录 `mvn -B clean verify` 运行 161 个用例（core 41 + cli 10 + npm 39 + Go 40 + Python 31），覆盖核心链路与三种扩展；同时产出可直接运行的 `distribution/target/dist/`。T7（CLI 放入/移走插件的端到端集成）仍待补，已手工验证装配目录内扫描四种样例均能发现对应插件，Maven 样例因阻断依赖返回 1，其余返回 0，不放入插件时仍返回 4。实际执行结果：一条 `BUILD SUCCESS`，161 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
 
 ## 协作与贡献入口
 
@@ -160,4 +163,4 @@ CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时�
 
 项目采用 MIT License，理由：课程作业以开放协作为目标，MIT 条款简单、对依赖方限制最少。关键依赖：`org.json`（core 解析 `licenses.json`）、JUnit（测试）与 Maven 插件，均按其各自许可证使用，未在仓库中捆绑第三方二进制；`org.json` 的许可证条款（JSON License 及其历史附加条款）需在发布前核对。
 
-已知限制：npm、Go 与 Python 扩展均已实现（npm/Go 已合入 `master`，Python 在本分支），但插件 jar 需先独立构建并放入 `--plugins` 目录才会被发现（构建前扫描 `package-lock.json` / `go.mod` / `requirements.txt` 返回退出码 4 属预期）；`supports()` 对 npm 只认精确文件名 `package-lock.json`，对 Go 只认 `go.mod`，对 Python 认文件名含 `requirement` 的 `.txt/.in/.pip`，`*.v1.json`、`go.single-require.mod` 等 fixture 供契约测试使用，手工演示需复制改名；`licenses.json` 收录 42 条 Maven 坐标，npm / Go / Python 依赖均按 `UNKNOWN` 处理；参数错误复用退出码 `2`，契约暂无“用法错误”一档；报告含生成时间，同一输入输出排序确定但字节不一致，跨平台路径分隔符也不同；`PolicyEngine.select()` 已实现，但 `ScanEngine` 仍内联策略选择，未接入该类；T7 CLI 集成测试待补；`docs/DESIGN.docx` 已随工程提交，`release/RELEASE.md` 尚未完成。当前版本可对 Maven、npm、Go、Python 清单产出审计报告，不覆盖传递依赖分析、联网查询与源码扫描。
+已知限制：`supports()` 对 npm 只认精确文件名 `package-lock.json`，对 Go 只认 `go.mod`，对 Python 认文件名含 `requirement` 的 `.txt/.in/.pip`，`*.v1.json`、`go.single-require.mod` 等 fixture 供契约测试使用，手工演示需复制改名；`licenses.json` 收录 54 条，按 `ecosystem:name` 精确匹配并回退纯名称，未命中才为 `UNKNOWN`；参数错误复用退出码 `2`，契约暂无“用法错误”一档；报告含生成时间，同一输入输出排序确定但字节不一致，跨平台路径分隔符也不同；`PolicyEngine.select()` 已实现，但 `ScanEngine` 仍内联策略选择，未接入该类；T7 CLI 集成测试待补；`docs/DESIGN.docx` 已随工程提交，`release/RELEASE.md` 尚未完成。当前版本可对 Maven、npm、Go、Python 清单产出审计报告，不覆盖传递依赖分析、联网查询与源码扫描。
