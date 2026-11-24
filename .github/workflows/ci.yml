@@ -28,5 +28,42 @@ jobs:
       - name: Build, test and assemble distribution
         run: mvn -B clean verify
 
-      - name: Smoke test assembled CLI
-        run: java -jar distribution/target/dist/licenselens-cli.jar scan --manifest samples/demo-npm/package-lock.json --plugins distribution/target/dist/plugins --out report.md
+      - name: Smoke test assembled CLI (T7/T8)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd distribution/target/dist
+
+          run_scan() {
+            expected_exit="$1"
+            expected_summary="$2"
+            shift 2
+            set +e
+            output=$(java -jar licenselens-cli.jar "$@" 2>&1)
+            actual=$?
+            set -e
+            if [ "$actual" -ne "$expected_exit" ]; then
+              echo "退出码不符: 期望 $expected_exit，实际 $actual；参数: $*" >&2
+              echo "$output" >&2
+              exit 1
+            fi
+            if [ -n "$expected_summary" ] && ! printf '%s\n' "$output" | grep -qF "$expected_summary"; then
+              echo "摘要不符: 期望包含 \"$expected_summary\"；实际输出:" >&2
+              echo "$output" >&2
+              exit 1
+            fi
+          }
+
+          # T7：默认 ./plugins 中的三个插件 jar 应被自动发现
+          run_scan 1 '策略: campus | 依赖数: 4 | 阻断: 1 | 未知: 0' scan --manifest samples/demo-maven/pom.xml --out smoke-maven.md
+          run_scan 0 '策略: campus | 依赖数: 1 | 阻断: 0 | 未知: 0' scan --manifest samples/demo-npm/package-lock.json --out smoke-npm.md
+          run_scan 0 '策略: campus | 依赖数: 6 | 阻断: 0 | 未知: 4' scan --manifest samples/demo-go/go.mod --out smoke-go.md
+          run_scan 0 '策略: campus | 依赖数: 3 | 阻断: 0 | 未知: 0' scan --manifest samples/demo-python/requirements.txt --out smoke-python.md
+
+          # T8：移走插件目录后，三种扩展清单应返回 4；内置 Maven 仍可用
+          mv plugins plugins.off
+          trap 'mv plugins.off plugins' EXIT
+          run_scan 4 '' scan --manifest samples/demo-npm/package-lock.json --plugins plugins --out smoke-npm-no-plugin.md
+          run_scan 4 '' scan --manifest samples/demo-go/go.mod --plugins plugins --out smoke-go-no-plugin.md
+          run_scan 4 '' scan --manifest samples/demo-python/requirements.txt --plugins plugins --out smoke-python-no-plugin.md
+          run_scan 1 '策略: campus | 依赖数: 4 | 阻断: 1 | 未知: 0' scan --manifest samples/demo-maven/pom.xml --plugins plugins --out smoke-maven-no-plugin.md
