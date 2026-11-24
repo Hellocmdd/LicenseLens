@@ -11,14 +11,14 @@
 
 ## 二、项目速览
 
-LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单，匹配许可证快照，按策略判定风险，输出可核对的 Markdown 报告与退出码。
+LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单，匹配许可证快照，按策略判定风险，输出可核对的 Markdown 或 JSON 报告与退出码。
 
 ```text
-依赖清单（pom.xml / package-lock.json / go.mod / requirements.txt）
+依赖清单（pom.xml / package-lock.json / go.mod / requirements.txt / pyproject.toml / uv.lock / environment.yml / conda-lock.yml）
   → CLI 加载内置与外部解析器（DependencySource）
   → ScanEngine 调度：选择解析器 → 解析为 List<Dependency>
   → LicenseCatalog 查快照 → Policy 判定 Decision
-  → ReportRenderer 生成报告（风险降序，名称升序）
+  → 报告渲染器生成 Markdown / JSON 报告（风险降序，名称升序）
   → 终端摘要 + 报告文件 + 退出码
 ```
 

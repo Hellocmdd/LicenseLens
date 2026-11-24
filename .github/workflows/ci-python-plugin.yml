@@ -41,7 +41,7 @@ jobs:
           mvn -B -N install -DskipTests
           mvn -B -pl licenselens-spi install -DskipTests
 
-      - name: Verify Python plugin (74 contract tests)
+      - name: Verify Python plugin (77 contract tests)
         working-directory: plugins/licenselens-python
         run: mvn -B clean verify
 

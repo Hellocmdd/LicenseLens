@@ -66,7 +66,7 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 输入 | `pom.xml`、`package-lock.json`、`go.mod` 或 `requirements.txt`（通过 `supports()` 自动识别） |
+| 输入 | `pom.xml`、`package-lock.json`、`go.mod`，以及 Python 侧 `requirements.txt` / `pyproject.toml` / `uv.lock` / `environment.yml` / `conda-lock.yml`（通过 `supports()` 自动识别） |
 | 参数 | `--manifest`（必填）、`--policy`（默认 campus）、`--plugins`（默认 ./plugins）、`--catalog`（外置许可证快照）、`--format`（默认 markdown，可选 json）、`--out`（默认 ./report.md） |
 | 中间产物 | 无（纯内存处理，报告排序确定） |
 | 输出 | Markdown 或 JSON 报告 + 终端摘要 + 退出码 |
@@ -125,7 +125,7 @@ public final class SourceException extends Exception {
 
 - 扩展在 `META-INF/services/edu.course.licenselens.spi.DependencySource` 中声明实现类；
 - CLI 用独立 `URLClassLoader` 加载 `--plugins` 目录下所有 jar；
-- 选择顺序：按注入顺序取第一个 `supports()` 返回 true 的解析器（内置 Maven 在前，插件按目录项顺序）；冻结契约仍写 `id()` 字典序，待按变更流程对齐；
+- 选择顺序：按 `id()` 字典序取第一个 `supports()` 返回 true 的解析器；与 `docs/CONTRACT.md` 一致，内置 Maven 的 id 为 `maven`；
 - 无法识别的 jar 跳过并告警，不中断扫描。
 
 ### 3.3 错误契约
@@ -191,14 +191,20 @@ licenselens/
 ├─ plugins/
 │  ├─ licenselens-npm/          # 独立扩展：v1/v2/v3 已实现，随根 reactor 构建
 │  ├─ licenselens-go/           # 独立扩展：go.mod 解析已实现，随根 reactor 构建
-│  └─ licenselens-python/       # 独立扩展：requirements.txt 解析已实现，随根 reactor 构建
+│  └─ licenselens-python/       # 独立扩展：requirements.txt / pyproject.toml / uv.lock / environment.yml / conda-lock.yml 解析已实现，随根 reactor 构建
 ├─ distribution/                # 统一装配 CLI 与插件 jar 到 target/dist/
+├─ licenselens-it/              # 基于装配产物的 CLI 插件集成测试（T7/T8）
 ├─ samples/
 │  ├─ demo-maven/pom.xml
 │  ├─ demo-npm/package-lock.json
 │  ├─ demo-npm/package-lock.v1.json
 │  ├─ demo-npm/package-lock.v2.json
 │  ├─ demo-go/go.mod
+│  ├─ demo-python/requirements.txt
+│  ├─ demo-python/pyproject.toml
+│  ├─ demo-python/uv.lock
+│  ├─ demo-python/environment.yml
+│  ├─ demo-python/conda-lock.yml
 │  ├─ edge/empty.xml
 │  ├─ edge/bad-pom.xml
 │  ├─ edge/bad-lock.json
@@ -237,7 +243,7 @@ licenselens/
 
 ### Gate 3：扩展接入（Day 4-5）
 
-- npm、Go 与 Python 插件均已实现，分别通过 39 / 40 / 31 个契约测试
+- npm、Go 与 Python 插件均已实现，分别通过 39 / 40 / 77 个契约测试；Python 侧覆盖 `requirements.txt` / `pyproject.toml` / `uv.lock` / `environment.yml` / `conda-lock.yml`
 - `mvn -B clean verify` 由 `distribution` 模块统一装配 CLI 与插件 jar 到 `distribution/target/dist/`，CLI 自动发现
 - 单独构建插件时仍可手动放入/移走 jar；移走全部插件后扫同一文件 → 退出码 4，提示安装
 
@@ -272,7 +278,7 @@ licenselens/
 | --- | --- | --- |
 | P0 | Gate 0：契约冻结 | CONTRACT.md 全组签字，任何代码不得开始 |
 | P1 | 骨架搭建 | parent pom + 三模块 + npm 空插件 + Checkstyle + CI；`mvn -B compile` 全过 |
-| P2 | 核心功能 | Maven 解析 + 扫描引擎 + 策略引擎 + 报告渲染；demo-maven 闭环跑通；51 个核心/CLI 测试全绿（扩展另计 npm 39 + Go 40 + Python 31 个） |
+| P2 | 核心功能 | Maven 解析 + 扫描引擎 + 策略引擎 + 报告渲染；demo-maven 闭环跑通；64 个核心/CLI 测试全绿（扩展另计 npm 39 + Go 40 + Python 77 个，`licenselens-it` 4 个） |
 | P3 | 扩展接入 | 三类插件实现 + 契约测试；`distribution` 装配后生效，移走报错；核心零新增提交 |
 | P4 | CLI 完善 | 参数解析 + 退出码 + 插件目录加载；四种策略切换验证 |
 | P5 | 故意改错演示 | 排序改升降序 → T1 红 → 恢复 → T1 绿；完整演示一次 |
@@ -300,7 +306,7 @@ licenselens/
 | T6 | 失败 | 损坏的 XML（`samples/edge/bad-pom.xml`） | 退出码 3，提示含行号（> 0） | 错误定位 |
 | T7 | 扩展 | `distribution` 装配后扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；`licenselens-it` 的 JUnit 集成测试覆盖 | 扩展接入（已覆盖） |
 | T8 | 扩展 | 移走插件 jar 后扫同一文件 | 退出码 4，提示安装插件 | 降级行为 |
-| T9 | 契约 | npm 39 例 + Go 40 例 + Python 31 例（不依赖 core） | 解析结果字段、错误码与发现规则正确 | 契约稳定性（三个扩展均已覆盖） |
+| T9 | 契约 | npm 39 例 + Go 40 例 + Python 77 例（不依赖 core） | 解析结果字段、错误码与发现规则正确，Python 侧覆盖五类清单 | 契约稳定性（三个扩展均已覆盖） |
 
 **故意改错演示**：把 R3 排序比较器由 `Comparator.comparing(Dependency::riskLevel).reversed()` 改成自然序，T1 变红；`git checkout -- <file>` 恢复后变绿。
 
@@ -335,7 +341,7 @@ licenselens/
 | --- | --- |
 | 一个核心场景 | `scan` 一条命令 → 报告 + 退出码 |
 | 一种扩展机制 + 一个独立扩展 | `DependencySource` SPI + npm 插件 |
-| 有效测试 | T1—T9（T7/T8 已由 `licenselens-it` 覆盖，T9 已由 npm 39 + Go 40 + Python 31 例覆盖）；故意改错演示 |
+| 有效测试 | T1—T9（T7/T8 已由 `licenselens-it` 覆盖，T9 已由 npm 39 + Go 40 + Python 77 例覆盖）；故意改错演示 |
 | 基础质量控制 | Checkstyle + `mvn -B verify` |
 | 真实协作 | 每人一条分支 + 一次实质 Review + README 协作表 |
 | CI | GitHub Actions 保留一次绿色运行记录 |
