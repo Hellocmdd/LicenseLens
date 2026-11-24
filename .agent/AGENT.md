@@ -31,7 +31,7 @@ LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单�
 | `licenselens-cli` | 参数解析、退出码、插件目录加载（`URLClassLoader` + `ServiceLoader`） | parent reactor |
 | `plugins/licenselens-npm` | 独立扩展：`package-lock.json`（v1/v2/v3）解析，39 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
 | `plugins/licenselens-go` | 独立扩展：`go.mod` 解析，40 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
-| `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` 解析，31 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
+| `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` / `pyproject.toml` / `uv.lock` / `environment.yml` / `conda-lock.yml` 解析，77 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
 | `distribution` | 统一装配 CLI 与三个插件 jar 到 `target/dist/`，供本地运行与发布复用 | 根 reactor 模块 |
 | `licenselens-it` | 基于装配产物的 CLI 插件集成测试：T7/T8 与加载失败降级 | 根 reactor 模块 |
 | `samples/` | 各模块样例与边界样例，测试直接引用 | — |
@@ -41,7 +41,7 @@ LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单�
 
 - **契约 v1 已冻结**：接口签名、退出码表、错误契约、兼容策略均已定稿。需要变更时先改 `docs/CONTRACT.md`，再改代码。
 - **退出码**：`0` 正常 / `1` 存在阻断依赖 / `2` 清单文件不存在 / `3` 清单语法错误 / `4` 无可用解析器。插件 jar 加载失败属降级：告警后跳过，不中断扫描。
-- **注册与选择**：内置 Maven 解析器由构造注入，不走 ServiceLoader；外部插件靠 jar 内 `META-INF/services/edu.course.licenselens.spi.DependencySource` 声明，按 `id()` 字典序取第一个 `supports()` 为 true 的解析器（内置 Maven 的 id 为 `maven`）。
+- **注册与选择**：内置 Maven 解析器由构造注入，不走 ServiceLoader；外部插件靠 jar 内 `META-INF/services/edu.course.licenselens.spi.DependencySource` 声明，按 `id()` 字典序取第一个 `supports()` 为 true 的解析器（内置 Maven 的 id 为 `maven`；Python 扩展已注册 `python`、`python-uv` 与 `python-conda` 三个 id，认领范围按文件名互斥）。
 - **确定性输出**：报告排序固定为风险降序，同风险等级内按名称升序；风险序为 `STRONG_COPYLEFT` → `WEAK_COPYLEFT` → `PERMISSIVE` → `UNKNOWN`（**不是** `RiskLevel` 的声明顺序，别直接用 `ordinal()`）。同一输入排序一致；报告含生成时间，字节不完全一致。
 - **许可证快照**：`licenses.json` 当前收录 54 条，覆盖 Maven / npm / Go / Python；先按 `ecosystem:name` 精确匹配，未命中回退纯名称，最后返回 `UNKNOWN` 占位，不得猜测许可证。
 - **范围边界（本次不做）**：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容。许可证结论为课程级判断，不构成法律意见。

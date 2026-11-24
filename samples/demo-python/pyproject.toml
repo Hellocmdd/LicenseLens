@@ -1,0 +1,14 @@
+[project]
+name = "demo-python"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = [
+    "requests==2.31.0",
+    "flask>=2.2,<3.0",
+    "numpy==1.26.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+]
