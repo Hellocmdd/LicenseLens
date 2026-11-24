@@ -25,6 +25,12 @@
         <!-- code-style.md 10：禁止通配符 import；按需逐个引入 -->
         <module name="AvoidStarImport"/>
         <module name="RedundantImport"/>
+        <module name="UnusedImports"/>
+
+        <!-- code-style.md 5：不吞异常，禁止宽泛的 catch (Throwable) -->
+        <module name="IllegalCatch">
+            <property name="illegalClassNames" value="Throwable"/>
+        </module>
 
         <!-- code-style.md 2：命名约定 -->
         <module name="PackageName">
