@@ -9,7 +9,9 @@ import edu.course.licenselens.spi.Policy;
 import edu.course.licenselens.spi.RiskLevel;
 import edu.course.licenselens.spi.SourceException;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -34,14 +36,26 @@ public class ScanEngine {
 
     private final LicenseCatalog catalog;
     private final List<DependencySource> sources;
-    private final List<Policy> policies;
+    private final PolicyEngine policyEngine;
 
+    /**
+     * 用策略列表构造扫描引擎，策略选择统一交给 {@link PolicyEngine}。
+     */
     public ScanEngine(LicenseCatalog catalog,
                       List<DependencySource> sources,
                       List<Policy> policies) {
+        this(catalog, sources, new PolicyEngine(policies));
+    }
+
+    /**
+     * 用策略引擎构造扫描引擎，便于 CLI 在扫描前复用同一份策略校验。
+     */
+    public ScanEngine(LicenseCatalog catalog,
+                      List<DependencySource> sources,
+                      PolicyEngine policyEngine) {
         this.catalog = catalog;
         this.sources = sources;
-        this.policies = policies;
+        this.policyEngine = policyEngine;
     }
 
     /**
@@ -52,6 +66,23 @@ public class ScanEngine {
      * @return 扫描结果（含退出码和报告）
      */
     public ScanResult scan(Path manifest, String policyId) throws SourceException {
+        return scan(manifest, policyId, "markdown");
+    }
+
+    /**
+     * 执行扫描并按指定格式生成报告。
+     *
+     * @param manifest 清单文件路径
+     * @param policyId 策略标识（"campus" 或 "permissive-only"）
+     * @param format   报告格式，"markdown" 或 "json"
+     * @return 扫描结果（含退出码和报告）
+     * @throws SourceException 清单不存在、语法错误或没有解析器支持该格式
+     */
+    public ScanResult scan(Path manifest, String policyId, String format) throws SourceException {
+        if (!"markdown".equals(format) && !"json".equals(format)) {
+            throw new IllegalArgumentException("不支持的报告格式: " + format);
+        }
+
         // 1. 文件校验
         if (!Files.exists(manifest)) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
@@ -61,9 +92,9 @@ public class ScanEngine {
         // 2. 构建 ManifestRef（含首行嗅探）
         String fileName = manifest.getFileName().toString();
         String firstLine;
-        try {
-            firstLine = Files.readString(manifest).lines()
-                    .findFirst().orElse("");
+        try (BufferedReader reader = Files.newBufferedReader(manifest, StandardCharsets.UTF_8)) {
+            String line = reader.readLine();
+            firstLine = line == null ? "" : line;
         } catch (IOException e) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
                     "无法读取文件: " + e.getMessage());
@@ -82,8 +113,12 @@ public class ScanEngine {
                     selected = src;
                     break;
                 }
-            } catch (Throwable t) {
-                // 某个解析器 supports 抛异常 → 跳过继续找
+            } catch (RuntimeException e) {
+                System.err.println("WARN: 解析器 " + src.id()
+                        + " 的 supports 抛异常（已跳过）: " + e.getMessage());
+            } catch (LinkageError e) {
+                System.err.println("WARN: 解析器 " + src.id()
+                        + " 的 supports 链接失败（已跳过）: " + e.getMessage());
             }
         }
         if (selected == null) {
@@ -94,11 +129,8 @@ public class ScanEngine {
         // 4. 解析依赖列表
         List<Dependency> deps = selected.parse(manifest);
 
-        // 5. 选策略
-        Policy policy = policies.stream()
-                .filter(p -> p.id().equals(policyId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("未知策略: " + policyId));
+        // 5. 选策略：统一走 PolicyEngine，避免与 CLI 各自实现一份选择逻辑
+        Policy policy = policyEngine.select(policyId);
 
         // 6. 逐条匹配许可证 + 策略判定
         ReportRenderer renderer = new ReportRenderer();
@@ -115,7 +147,9 @@ public class ScanEngine {
         }
 
         // 7. 生成报告
-        String report = renderer.render(rows, policy, manifest.toString());
+        String report = "json".equals(format)
+                ? new JsonReportRenderer().render(rows, policy, manifest.toString())
+                : renderer.render(rows, policy, manifest.toString());
 
         // 8. 计算退出码
         int exitCode = blockedCount > 0 ? 1 : 0;

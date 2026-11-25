@@ -12,11 +12,12 @@
 | T4 | 非预期输入：缺 version、未知字段、未知许可证、非常规 scope | core | 不崩溃；未命中走 `UNKNOWN`；行为与契约一致 |
 | T5 | 文件不存在 | core + cli | `SourceException.Code.FILE_NOT_FOUND`；退出码 2；stderr 含路径 |
 | T6 | 清单语法错误 | core + cli | `PARSE_ERROR` 且 `line() > 0`；退出码 3 |
-| T7 | 扩展接入后生效：jar 放入插件目录被自动发现 | cli 集成测试（待补） | 新格式清单能解析出预期依赖；退出码按判定结果 |
-| T8 | 移走扩展后无可用解析器 | cli 集成测试 | 退出码 4；提示安装插件；不抛未捕获异常 |
-| T9 | 扩展契约：只依赖 spi 验证输入输出与错误码 | `plugins/*/src/test` | npm 39 例 + Go 40 例 + Python 31 例已覆盖 `id()`、`supports()`、`parse()` 与 `SourceException` 码 |
+| T7 | 扩展接入后生效：jar 放入插件目录被自动发现 | `licenselens-it` 集成测试 | 新格式清单能解析出预期依赖；退出码按判定结果 |
+| T8 | 移走扩展后无可用解析器 | `licenselens-it` 集成测试 | 退出码 4；提示安装插件；不抛未捕获异常 |
+| T9 | 扩展契约：只依赖 spi 验证输入输出与错误码 | `plugins/*/src/test` | npm 39 例 + Go 40 例 + Python 77 例已覆盖 `id()`、`supports()`、`parse()` 与 `SourceException` 码；Python 侧含 `requirements.txt` / `pyproject.toml` / `uv.lock` / `environment.yml` / `conda-lock.yml` |
 
-- T1–T6 由 core/cli 侧维护；T9 由扩展侧维护，**不得依赖 core**；T7 集成用例待补，T8 由 core/cli 测试覆盖。
+- T1–T6 由 core/cli 侧维护；T7/T8 由 `licenselens-it` 基于装配产物验证；T9 由扩展侧维护，**不得依赖 core**。
+- T7 同时覆盖插件加载失败降级：损坏 jar 与服务声明错误的 jar 告警后跳过，正常插件仍生效。
 - 同一用例可以覆盖多类行为，但矩阵里的每一项都要有对应用例；不要用"一个超级测试"覆盖全部。
 
 ## 2. 断言要求

@@ -6,19 +6,24 @@
 
 ```text
 1. 全部 PR 已合并，无未完成的功能分支
-2. mvn -B clean verify 通过（含核心、三个插件与 distribution 装配）
+2. mvn -B clean verify 通过（含核心、三个插件、distribution 装配与 licenselens-it 集成测试）
 3. 演示命令实跑通过（在 distribution/target/dist/ 执行，插件 jar 已自动装配）：
    java -jar licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml
    java -jar licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml --policy permissive-only
    java -jar licenselens-cli.jar scan --manifest samples/demo-npm/package-lock.json
    java -jar licenselens-cli.jar scan --manifest samples/demo-go/go.mod
    java -jar licenselens-cli.jar scan --manifest samples/demo-python/requirements.txt
+   java -jar licenselens-cli.jar scan --manifest samples/demo-python/pyproject.toml
+   java -jar licenselens-cli.jar scan --manifest samples/demo-python/uv.lock
+   java -jar licenselens-cli.jar scan --manifest samples/demo-python/environment.yml
+   java -jar licenselens-cli.jar scan --manifest samples/demo-python/conda-lock.yml
 4. README 的构建/运行命令与当前产物名一致，无占位符
 5. git status 干净
 ```
 
-- 版本号按实际成熟度选，通常 `0.1.0`；不强行凑 `1.0.0`。
-- 产物名与 jar 版本号要对得上：当前 `pom.xml` 为 `0.1.0-SNAPSHOT`，正式发布前决定是否改为 `0.1.0` 并同步 README 中的命令。
+- 版本号按实际成熟度选；当前开发分支准备发布 `v0.2.x`，不强行凑 `1.0.0`。
+- 发布 Tag 与 jar 版本号无需一致：`pom.xml` 当前为 `0.1.0-SNAPSHOT`，release workflow 以 Tag 名生成 `licenselens-${TAG}-linux.tar.gz` 与 `licenselens-${TAG}-windows.zip`；README 中的命令已与产物名对齐。
+- 本地 `v0.2.0` 标签仍在旧 `master` 提交 `22eb39e`，发布当前成果前需删除旧标签重打。
 
 ## 2. 打 Tag
 
@@ -27,14 +32,14 @@
 git rev-parse HEAD
 git status
 
-# 附注标签，必须带说明
-git tag -a v0.1.0 -m "release: LicenseLens v0.1.0 首个可运行版本"
+# 附注标签，必须带说明；以实际发布版本替换 vX.Y.Z
+git tag -a vX.Y.Z -m "release: LicenseLens vX.Y.Z"
 
 # 校验 Tag 指向 HEAD
-git rev-list -n 1 v0.1.0
+git rev-list -n 1 vX.Y.Z
 
 # 逐个推送（先走确认流程）
-git push origin v0.1.0
+git push origin vX.Y.Z
 ```
 
 - 用附注标签，不用轻量标签。

@@ -11,8 +11,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -77,8 +79,23 @@ public class MavenManifestParser implements DependencySource {
         }
     }
 
+    /**
+     * 解析 POM 及其 {@code <modules>} 子 POM，返回合并后的直接依赖（按四元组去重）。
+     *
+     * @param file POM 路径
+     * @return 直接依赖列表，按首次出现顺序返回
+     * @throws SourceException 文件不存在、XML 语法错误或模块 POM 缺失
+     */
     @Override
     public List<Dependency> parse(Path file) throws SourceException {
+        return parse(file, new LinkedHashSet<>());
+    }
+
+    private List<Dependency> parse(Path file, Set<Path> visited) throws SourceException {
+        Path normalized = file.toAbsolutePath().normalize();
+        if (!visited.add(normalized)) {
+            return List.of();
+        }
         if (!Files.exists(file)) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
                     "pom.xml 不存在: " + file);
@@ -128,14 +145,14 @@ public class MavenManifestParser implements DependencySource {
 
         doc.getDocumentElement().normalize();
 
-        List<Dependency> result = new ArrayList<>();
+        Set<Dependency> collected = new LinkedHashSet<>();
 
         // 只认真正的依赖声明：跳过 <dependencyManagement> 里被"管理"的条目，
         // 它们不是实际依赖，计入会造成虚报；<profiles> 内的依赖暂不展开。
         NodeList depLists = doc.getElementsByTagName("dependencies");
         for (int i = 0; i < depLists.getLength(); i++) {
             Element depsContainer = (Element) depLists.item(i);
-            if (isInsideDependencyManagement(depsContainer)) {
+            if (isInsideDependencyManagement(depsContainer) || isInsideProfiles(depsContainer)) {
                 continue;
             }
 
@@ -151,7 +168,7 @@ public class MavenManifestParser implements DependencySource {
                 }
 
                 if (groupId != null && artifactId != null) {
-                    result.add(new Dependency(
+                    collected.add(new Dependency(
                             "maven",
                             groupId + ":" + artifactId,
                             version != null ? version : "",
@@ -161,13 +178,47 @@ public class MavenManifestParser implements DependencySource {
             }
         }
 
-        return result;
+        // 递归展开 <modules>：只取 project 直接子节点，不进入 <profiles>。
+        // 同一 POM 只访问一次，模块互相引用时不会无限递归。
+        for (Element modules : childElements(doc.getDocumentElement(), "modules")) {
+            for (Element module : childElements(modules, "module")) {
+                String moduleText = module.getTextContent().trim();
+                if (moduleText.isEmpty()) {
+                    continue;
+                }
+                if (moduleText.contains("${")) {
+                    System.err.println("WARN: 跳过含占位符的模块路径: " + moduleText);
+                    continue;
+                }
+                Path modulePom = normalized.getParent().resolve(moduleText).normalize();
+                if (!moduleText.endsWith(".xml")) {
+                    modulePom = modulePom.resolve("pom.xml");
+                }
+                if (!Files.isRegularFile(modulePom)) {
+                    throw new SourceException(SourceException.Code.PARSE_ERROR,
+                            "模块 POM 不存在: " + moduleText + "（相对 " + file + "）");
+                }
+                collected.addAll(parse(modulePom, visited));
+            }
+        }
+
+        return new ArrayList<>(collected);
     }
 
     private static boolean isInsideDependencyManagement(Element element) {
         for (Node parent = element.getParentNode(); parent != null; parent = parent.getParentNode()) {
             if (parent.getNodeType() == Node.ELEMENT_NODE
                     && "dependencyManagement".equals(parent.getNodeName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isInsideProfiles(Element element) {
+        for (Node parent = element.getParentNode(); parent != null; parent = parent.getParentNode()) {
+            if (parent.getNodeType() == Node.ELEMENT_NODE
+                    && "profiles".equals(parent.getNodeName())) {
                 return true;
             }
         }

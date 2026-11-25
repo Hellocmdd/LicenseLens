@@ -28,7 +28,7 @@
 | --- | --- |
 | 真实问题 | 许可证冲突是开源协作中的高频问题，不是虚构需求 |
 | 可验证 | 输出是文本报告，逐行可断言，不依赖网络与模型 |
-| 可扩展 | 新增一个生态（npm / Gradle）只需新增一个解析器，核心零改动 |
+| 可扩展 | 新增一个生态（npm / Go / Python）只需新增一个解析器，核心零改动 |
 | 范围可控 | 不需要数据库、登录、Web、热加载 |
 
 ### 1.4 本案例不解决的问题
@@ -70,7 +70,7 @@
 一条命令执行后，必须同时满足：
 
 1. 终端打印依赖总数、风险分布、阻断项数量；
-2. 生成一份 Markdown 报告，逐条列出依赖、版本、许可证、风险、判定、理由；
+2. 生成一份 Markdown 报告（或可选 JSON 报告），逐条列出依赖、版本、许可证、风险、判定、理由；
 3. 存在被策略阻断的依赖时，退出码为 1；
 4. 输入错误时给出可读提示（含路径或行号），不打印堆栈。
 
@@ -85,11 +85,11 @@
 | FR-1 | 解析 Maven `pom.xml`，提取直接依赖的四元组 | 必须 | 样例工程解析出 4 条 |
 | FR-2 | 识别依赖的许可证与风险等级 | 必须 | 报告列与快照一致 |
 | FR-3 | 按策略给出允许/警告/阻断判定 | 必须 | 两种策略结果不同 |
-| FR-4 | 输出 Markdown 报告文件 | 必须 | 文件存在且内容逐行比对 |
+| FR-4 | 输出 Markdown 报告文件，可选 JSON 报告 | 必须 | 文件存在且内容逐行比对 |
 | FR-5 | 终端摘要与退出码 | 必须 | 5 种退出码（0/1/2/3/4）分别可复现 |
 | FR-6 | 未知许可证标记为 UNKNOWN 并汇总 | 必须 | 虚构 artifact 用例 |
 | FR-7 | 支持外部解析器插件（目录加载） | 必须 | `distribution` 装配插件后生效，移走后返回 4 |
-| FR-8 | 支持多生态扩展（npm / Go / Python） | 必须（扩展） | 扫 package-lock.json / go.mod / requirements.txt 成功 |
+| FR-8 | 支持多生态扩展（npm / Go / Python） | 必须（扩展） | 扫 `package-lock.json`、`go.mod` 及 Python 五类清单（`requirements.txt` / `pyproject.toml` / `uv.lock` / `environment.yml` / `conda-lock.yml`）成功 |
 | FR-9 | 多清单批量扫描 | 可选 | 未实现则写入限制 |
 
 ### 3.2 非功能需求
@@ -106,7 +106,7 @@
 ### 3.3 范围边界（写进 README）
 
 ```text
-本次实现：Maven 清单解析、许可证快照匹配、两种策略、Markdown 报告、npm 扩展、Go 扩展、Python 扩展
+本次实现：Maven 清单解析（含 modules 递归展开）、内置与外置许可证快照、两种策略、Markdown / JSON 报告、npm / Go / Python 扩展（Python 侧含 `requirements.txt` / `pyproject.toml` / `uv.lock` / `environment.yml` / `conda-lock.yml`）、T7/T8 集成测试
 本次不做：传递依赖、联网查询、SBOM 导出、源码扫描、GUI、插件市场、热加载
 ```
 
@@ -165,14 +165,20 @@ licenselens/
 ├─ plugins/
 │  ├─ licenselens-npm/          # 独立扩展：v1/v2/v3 已实现，随根 reactor 构建
 │  ├─ licenselens-go/           # 独立扩展：go.mod 解析已实现，随根 reactor 构建
-│  └─ licenselens-python/       # 独立扩展：requirements.txt 解析已实现，随根 reactor 构建
+│  └─ licenselens-python/       # 独立扩展：requirements.txt / pyproject.toml / uv.lock / environment.yml / conda-lock.yml 解析已实现，随根 reactor 构建
 ├─ distribution/                # 统一装配 CLI 与插件 jar 到 target/dist/
+├─ licenselens-it/              # 基于装配产物的 CLI 插件集成测试（T7/T8）
 ├─ samples/
 │  ├─ demo-maven/pom.xml
 │  ├─ demo-npm/package-lock.json
 │  ├─ demo-npm/package-lock.v1.json
 │  ├─ demo-npm/package-lock.v2.json
 │  ├─ demo-go/go.mod
+│  ├─ demo-python/requirements.txt
+│  ├─ demo-python/pyproject.toml
+│  ├─ demo-python/uv.lock
+│  ├─ demo-python/environment.yml
+│  ├─ demo-python/conda-lock.yml
 │  ├─ edge/empty.xml
 │  └─ edge/bad-lock.json
 ├─ docs/
@@ -233,7 +239,7 @@ public final class SourceException extends Exception {
 
 - 扩展在 `META-INF/services/edu.course.licenselens.spi.DependencySource` 中声明实现类；
 - CLI 启动时用独立 `URLClassLoader` 加载 `--plugins` 目录下所有 jar，再 `ServiceLoader.load(DependencySource.class, loader)`；
-- 选择顺序：按注入顺序取第一个 `supports()` 返回 true 的解析器（内置 Maven 在前，插件按目录项顺序）；冻结契约仍写 `id()` 字典序，待按变更流程对齐；
+- 选择顺序：按 `id()` 字典序取第一个 `supports()` 返回 true 的解析器；与 `docs/CONTRACT.md` 一致，内置 Maven 的 id 为 `maven`；
 - 无法识别的 jar 跳过并告警，不中断扫描。
 
 ### 6.3 错误契约（写入 CONTRACT.md 并被测试覆盖）
@@ -368,6 +374,8 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 | `--manifest` | 是 | 无 | 清单文件路径 |
 | `--policy` | 否 | `campus` | 策略 ID |
 | `--plugins` | 否 | `./plugins` | 插件目录 |
+| `--catalog` | 否 | 内置快照 | 外置许可证快照；缺失或非法时回退内置 |
+| `--format` | 否 | `markdown` | 报告格式，`markdown` 或 `json` |
 | `--out` | 否 | `./report.md` | 报告输出路径 |
 
 不涉及任何密钥；如需扩展外部数据源，通过环境变量约定，不写入仓库。
@@ -405,7 +413,7 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 
 ### 决策四：文本报告 vs 结构化输出
 
-**结论**：只做 Markdown（可读性优先）。JSON 输出列为后续演进，不进入本次范围，避免范围膨胀。
+**结论**：默认 Markdown 保证可读性，同时提供 `--format json` 输出结构固定、排序一致的 JSON 报告，便于 CI 解析；SBOM 导出仍列为后续演进。
 
 ---
 
@@ -421,9 +429,9 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 | T4 | 边界 | 依赖名含 `$` 占位符 | 保留原样并标记 UNKNOWN | 非预期输入 |
 | T5 | 失败 | 不存在的路径 | 退出码 2，提示含路径 | 错误反馈 |
 | T6 | 失败 | 损坏的 XML（`samples/edge/bad-pom.xml`） | 退出码 3，提示含行号（实测第 15 行附近） | 错误定位 |
-| T7 | 扩展 | `distribution` 装配后扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；CLI 级集成用例待补 | 扩展接入（计划） |
+| T7 | 扩展 | `distribution` 装配后扫 `package-lock.json` | 报告含 npm 依赖行（如 `lodash:4.17.21`）；`licenselens-it` 的 JUnit 集成测试覆盖 | 扩展接入（已覆盖） |
 | T8 | 扩展 | 移走插件 jar 后扫同一文件 | 退出码 4，提示安装插件 | 降级行为 |
-| T9 | 扩展 | npm 39 例 + Go 40 例 + Python 31 例（不依赖 core） | 解析结果字段、错误码与发现规则正确 | 契约稳定性（三个扩展均已覆盖） |
+| T9 | 扩展 | npm 39 例 + Go 40 例 + Python 77 例（不依赖 core） | 解析结果字段、错误码与发现规则正确，Python 侧覆盖五类清单 | 契约稳定性（三个扩展均已覆盖） |
 
 ### 10.2 故意改错演示
 
@@ -480,8 +488,8 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 
 | 项 | 内容 |
 | --- | --- |
-| 版本 | 0.1.0（首个可用版本） |
-| 制品 | `licenselens-0.1.0.zip`：cli jar + npm / Go / Python 插件 jar + samples + 启动脚本 |
+| 版本 | 当前开发分支准备发布 `v0.2.x`；本地 `v0.2.0` 标签仍在旧 `master` 的 `22eb39e`，发布前需删旧标签重打 |
+| 制品 | release workflow 按 Tag 生成 `licenselens-${TAG}-linux.tar.gz`（含 `run.sh`）与 `licenselens-${TAG}-windows.zip`（含 `run.bat`），各附 `.sha256`；包内为 cli jar、npm / Go / Python 插件 jar、samples、README、LICENSE 与 `RUN.md` |
 | 环境 | JDK 21，无需 IDE |
 | 运行 | `mvn -B clean verify` 后在 `distribution/target/dist/` 执行 `java -jar licenselens-cli.jar scan --manifest samples/demo-maven/pom.xml`（发布版以 `RELEASE.md` 中记录的产物名为准） |
 
@@ -489,11 +497,13 @@ CLI  → 写 report.md，打印摘要，按结果设置退出码
 
 ```bash
 git status                    # 干净
-mvn -B clean verify           # 通过
-git tag -a v0.1.0 -m "Release 0.1.0"
-git rev-list -n 1 v0.1.0      # 与 HEAD 一致
-java -jar ... scan ...        # 实跑三条场景
-Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
+mvn -B clean verify           # 通过，224 个测试全绿
+git rev-parse HEAD            # 确认最终 Commit
+git tag -a vX.Y.Z -m "release: LicenseLens vX.Y.Z"
+git rev-list -n 1 vX.Y.Z      # 与 HEAD 一致
+java -jar ... scan ...        # 实跑核心与扩展场景
+sha256sum licenselens-vX.Y.Z-linux.tar.gz
+Get-FileHash licenselens-vX.Y.Z-windows.zip -Algorithm SHA256
 ```
 
 `release/RELEASE.md` 记录：版本、最终 Commit、Tag 目标、构建与 CI 状态、运行结果、SHA-256、已知限制、RELEASE/HOLD 决定。
@@ -529,7 +539,7 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | --- | --- | --- |
 | 一个核心场景 | `scan` 一条命令 → 报告 + 退出码 | 演示脚本 |
 | 一种扩展机制 + 一个独立扩展 | `DependencySource` SPI + npm 插件 | 插件 jar + `git log` 证明核心未改 |
-| 有效测试 | 161 个用例覆盖三类行为 | 测试报告 |
+| 有效测试 | 224 个用例覆盖三类行为、Python 五类清单与 CLI 插件集成 | 测试报告 |
 | 基础质量控制 | Checkstyle + CI | CI 运行记录 |
 | 真实协作 | 每人一个 PR + 一次实质 Review | README 协作表 |
 | 可追溯发布 | 附注 Tag + SHA-256 | RELEASE.md |
@@ -563,18 +573,18 @@ Get-FileHash release\licenselens-0.1.0.zip -Algorithm SHA256
 | 契约变更怎么处理？ | 记录在 CONTRACT.md，新增默认方法兼容；字段变更升主版本并公告 |
 | 报告为什么排序？ | 保证同一输入输出排序一致，便于测试与 diff；报告含生成时间，字节不完全一致 |
 | 覆盖率多少？ | 不追求数字；以三类行为的断言覆盖为准，故意改错能被测试发现 |
-| 你们的已知限制？ | 声明层、离线快照（54 条，未命中按 UNKNOWN）、T7 集成测试待补、无 SBOM、非法律意见 |
+| 你们的已知限制？ | 声明层、内置离线快照 54 条且支持外置 catalog、未命中按 UNKNOWN、无 SBOM 导出、非法律意见 |
 
 ---
 
 ## 17. 后续演进
 
-| 阶段 | 方向 | 前置条件 |
+| 阶段 | 方向 | 状态 / 前置条件 |
 | --- | --- | --- |
-| v0.2 | 增加 Gradle 解析器 | 契约无需变更 |
-| v0.3 | 支持传递依赖（解析依赖树） | 需要新的解析能力与缓存策略 |
-| v0.4 | JSON 结构化输出 | 报告模型抽出 |
-| v1.0 | 可替换许可证目录（外置 catalog） | 明确数据版本与校验方式 |
+| v0.2.x（当前开发分支） | 工程加固与声明层增强：显式 UTF-8、插件加载诊断、Maven modules 展开、外置 catalog、JSON 报告、T7/T8 集成测试 | 已实现于 `chore/delivery-hardening`，待 Review / 发布确认；`v0.2.0` 标签仍在旧 `master`，发布前需重打 |
+| v0.3 | 增加 Gradle 解析器 | 契约无需变更；当前未实现 |
+| v0.4 | 支持传递依赖（解析依赖树） | 需要新的解析能力与缓存策略 |
+| v1.0 | SBOM 导出、联网许可证数据源等 | 需明确数据版本与校验方式；外置 catalog 已在 v0.2.x 实现 |
 
 ---
 

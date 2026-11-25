@@ -25,4 +25,22 @@ public enum ExitCode {
         this.code = code;
         this.message = message;
     }
+
+    /**
+     * 把 {@code ScanResult.exitCode} 映射为 CLI 退出码枚举。
+     *
+     * @param value 契约退出码，范围 0 到 4
+     * @return 对应的退出码枚举
+     * @throws IllegalStateException 传入契约范围外的值
+     */
+    public static ExitCode fromValue(int value) {
+        return switch (value) {
+            case 0 -> OK;
+            case 1 -> BLOCKED;
+            case 2 -> FILE_NOT_FOUND;
+            case 3 -> PARSE_ERROR;
+            case 4 -> NO_PARSER;
+            default -> throw new IllegalStateException("ScanResult 返回未知退出码: " + value);
+        };
+    }
 }

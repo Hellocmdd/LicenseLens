@@ -11,14 +11,14 @@
 
 ## 二、项目速览
 
-LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单，匹配许可证快照，按策略判定风险，输出可核对的 Markdown 报告与退出码。
+LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单，匹配许可证快照，按策略判定风险，输出可核对的 Markdown 或 JSON 报告与退出码。
 
 ```text
-依赖清单（pom.xml / package-lock.json / go.mod / requirements.txt）
+依赖清单（pom.xml / package-lock.json / go.mod / requirements.txt / pyproject.toml / uv.lock / environment.yml / conda-lock.yml）
   → CLI 加载内置与外部解析器（DependencySource）
   → ScanEngine 调度：选择解析器 → 解析为 List<Dependency>
   → LicenseCatalog 查快照 → Policy 判定 Decision
-  → ReportRenderer 生成报告（风险降序，名称升序）
+  → 报告渲染器生成 Markdown / JSON 报告（风险降序，名称升序）
   → 终端摘要 + 报告文件 + 退出码
 ```
 
@@ -31,8 +31,9 @@ LicenseLens 是开源依赖许可证合规审计器：读取项目依赖清单�
 | `licenselens-cli` | 参数解析、退出码、插件目录加载（`URLClassLoader` + `ServiceLoader`） | parent reactor |
 | `plugins/licenselens-npm` | 独立扩展：`package-lock.json`（v1/v2/v3）解析，39 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
 | `plugins/licenselens-go` | 独立扩展：`go.mod` 解析，40 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
-| `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` / `pyproject.toml` / `uv.lock` / `environment.yml` / `conda-lock.yml` 解析，74 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
+| `plugins/licenselens-python` | 独立扩展：Python `requirements.txt` / `pyproject.toml` / `uv.lock` / `environment.yml` / `conda-lock.yml` 解析，77 个契约测试通过 | 根 reactor 模块；亦可单独构建，只依赖 spi |
 | `distribution` | 统一装配 CLI 与三个插件 jar 到 `target/dist/`，供本地运行与发布复用 | 根 reactor 模块 |
+| `licenselens-it` | 基于装配产物的 CLI 插件集成测试：T7/T8 与加载失败降级 | 根 reactor 模块 |
 | `samples/` | 各模块样例与边界样例，测试直接引用 | — |
 | `docs/` | `CONTRACT.md`（契约）、分工合作书、`DESIGN.docx`（设计文档） | — |
 

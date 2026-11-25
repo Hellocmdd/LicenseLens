@@ -10,7 +10,7 @@
    - Maven：`<dependencyManagement>`、`test`/`provided` scope、属性占位符、无 version 的依赖如何处理。
    - npm：`lockfileVersion` 1/2/3 差异（v1 用嵌套 `dependencies`，v2/v3 用 `packages`）、`dev` 标记、`""` 根包是否被误当依赖。
    - go.mod：`require` 单行与块、`// indirect`、`/vN` 主版本后缀、注释行。
-   - 许可证快照：`groupId:artifactId` 精确匹配，未命中是否返回 `UNKNOWN` 而不是猜。
+   - 许可证快照：先按 `ecosystem:name` 精确匹配，未命中回退纯 `name`，最后返回 `UNKNOWN` 而不是猜。
    - 输出确定性：排序键是否为"风险降序 → 名称升序"，集合是否用了不稳定的哈希顺序。
 4. **失败路径与退出码**：文件不存在→2，语法错误→3（带行号），无解析器→4，存在阻断→1，插件加载失败→告警后继续（不改变退出码）。CLI 是否在 stderr 给出可操作提示，core 是否误调 `System.exit`。
 5. **测试有效性**：断言是否落在具体值（条数、字段、退出码、报告关键行）；是否覆盖 T1–T9 中相关项；故意改错（如把排序比较器方向改反）能否让测试变红。

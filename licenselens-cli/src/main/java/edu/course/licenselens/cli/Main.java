@@ -3,6 +3,7 @@ package edu.course.licenselens.cli;
 import edu.course.licenselens.core.CampusPolicy;
 import edu.course.licenselens.core.LicenseCatalog;
 import edu.course.licenselens.core.PermissiveOnlyPolicy;
+import edu.course.licenselens.core.PolicyEngine;
 import edu.course.licenselens.core.ScanEngine;
 import edu.course.licenselens.core.ScanResult;
 import edu.course.licenselens.core.internal.MavenManifestParser;
@@ -11,6 +12,7 @@ import edu.course.licenselens.spi.Policy;
 import edu.course.licenselens.spi.SourceException;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,14 +39,19 @@ public class Main {
               --manifest <路径>    清单文件（pom.xml / package-lock.json / go.mod / requirements.txt）  [必填]
               --policy <策略>      campus | permissive-only                        [默认: campus]
               --plugins <目录>     插件目录                                         [默认: ./plugins]
+              --catalog <路径>     外置许可证快照（缺失或非法时回退内置）             [默认: 内置]
+              --format <格式>      markdown | json                                    [默认: markdown]
               --out <路径>         报告输出路径                                     [默认: ./report.md]
               -h, --help           显示帮助""";
 
     private static final String DEFAULT_POLICY = "campus";
     private static final String DEFAULT_PLUGINS = "./plugins";
+    private static final String DEFAULT_FORMAT = "markdown";
     private static final String DEFAULT_OUT = "./report.md";
 
     public static void main(String[] args) {
+        System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
+        System.setErr(new PrintStream(System.err, true, StandardCharsets.UTF_8));
         ExitCode code = run(args);
         System.exit(code.code);
     }
@@ -82,17 +89,23 @@ public class Main {
 
         List<DependencySource> sources = new ArrayList<>();
         sources.add(new MavenManifestParser());
-        sources.addAll(new PluginLoader().loadAll(options.pluginsDir().toFile()));
 
         List<Policy> policies = List.of(new CampusPolicy(), new PermissiveOnlyPolicy());
-        if (policies.stream().noneMatch(p -> p.id().equals(options.policyId()))) {
-            return usageError("未知策略: " + options.policyId() + "，可选: " + policyIds(policies));
+        PolicyEngine policyEngine = new PolicyEngine(policies);
+        try {
+            policyEngine.select(options.policyId());
+        } catch (IllegalArgumentException e) {
+            return usageError(e.getMessage() + "，可选: " + policyIds(policies));
+        }
+        if (!"markdown".equals(options.format()) && !"json".equals(options.format())) {
+            return usageError("未知报告格式: " + options.format() + "，可选: markdown, json");
         }
 
-        ScanEngine engine = new ScanEngine(new LicenseCatalog(), sources, policies);
+        try (PluginLoader pluginLoader = new PluginLoader()) {
+            sources.addAll(pluginLoader.loadAll(options.pluginsDir()));
 
-        try {
-            ScanResult result = engine.scan(manifest, options.policyId());
+            ScanEngine engine = new ScanEngine(new LicenseCatalog(options.catalog()), sources, policyEngine);
+            ScanResult result = engine.scan(manifest, options.policyId(), options.format());
 
             if (!writeReport(options.out(), result.reportContent())) {
                 System.err.println("WARN: 报告未写出，退出码只反映审计结果");
@@ -102,7 +115,7 @@ public class Main {
                     options.policyId(), result.totalCount(),
                     result.blockedCount(), result.unknownCount());
 
-            return result.blockedCount() > 0 ? ExitCode.BLOCKED : ExitCode.OK;
+            return ExitCode.fromValue(result.exitCode());
 
         } catch (SourceException e) {
             return switch (e.code()) {
@@ -133,6 +146,8 @@ public class Main {
         String manifestPath = null;
         String policyId = DEFAULT_POLICY;
         String pluginsDir = DEFAULT_PLUGINS;
+        String catalogPath = null;
+        String format = DEFAULT_FORMAT;
         String outPath = DEFAULT_OUT;
 
         for (int i = 1; i < args.length; i++) {
@@ -141,6 +156,8 @@ public class Main {
                 case "--manifest" -> manifestPath = requireValue(args, ++i, flag);
                 case "--policy" -> policyId = requireValue(args, ++i, flag);
                 case "--plugins" -> pluginsDir = requireValue(args, ++i, flag);
+                case "--catalog" -> catalogPath = requireValue(args, ++i, flag);
+                case "--format" -> format = requireValue(args, ++i, flag);
                 case "--out" -> outPath = requireValue(args, ++i, flag);
                 default -> throw new IllegalArgumentException("未知参数: " + flag);
             }
@@ -149,7 +166,8 @@ public class Main {
         if (manifestPath == null) {
             throw new IllegalArgumentException("缺少必填参数: --manifest");
         }
-        return new Options(Path.of(manifestPath), policyId, Path.of(pluginsDir), Path.of(outPath));
+        return new Options(Path.of(manifestPath), policyId, Path.of(pluginsDir),
+                catalogPath == null ? null : Path.of(catalogPath), format, Path.of(outPath));
     }
 
     private static String requireValue(String[] args, int index, String flag) {
@@ -199,6 +217,7 @@ public class Main {
     }
 
     /** 解析后的命令参数。 */
-    private record Options(Path manifest, String policyId, Path pluginsDir, Path out) {
+    private record Options(Path manifest, String policyId, Path pluginsDir, Path catalog,
+                           String format, Path out) {
     }
 }

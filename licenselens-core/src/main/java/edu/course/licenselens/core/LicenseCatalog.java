@@ -6,9 +6,13 @@ import edu.course.licenselens.spi.RiskLevel;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
@@ -21,8 +25,18 @@ public class LicenseCatalog {
 
     private final Map<String, LicenseInfo> entries;
 
+    /** 使用仓库内置的 {@code licenses.json} 快照。 */
     public LicenseCatalog() {
-        this.entries = load();
+        this(null);
+    }
+
+    /**
+     * 使用外置许可证快照；路径为空、文件不存在或解析失败时回退内置快照。
+     *
+     * @param externalCatalog 外置 {@code licenses.json} 路径，可为 {@code null}
+     */
+    public LicenseCatalog(Path externalCatalog) {
+        this.entries = externalCatalog == null ? load() : loadExternal(externalCatalog);
     }
 
     /**
@@ -59,30 +73,58 @@ public class LicenseCatalog {
     }
 
     private Map<String, LicenseInfo> load() {
-        Map<String, LicenseInfo> map = new HashMap<>();
         try (InputStream is = getClass().getResourceAsStream("/licenses.json")) {
             if (is == null) {
                 System.err.println("WARN: licenses.json 未找到，许可证快照为空");
-                return map;
+                return new HashMap<>();
             }
-            String content = new String(is.readAllBytes());
-            JSONObject root = new JSONObject(content);
-            for (String key : root.keySet()) {
-                JSONObject obj = root.getJSONObject(key);
-                String spdxId = obj.optString("spdxId", null);
-                String name = obj.optString("name", null);
-                String riskStr = obj.optString("risk", "UNKNOWN");
-                RiskLevel risk;
-                try {
-                    risk = RiskLevel.valueOf(riskStr);
-                } catch (IllegalArgumentException e) {
-                    risk = RiskLevel.UNKNOWN;
-                }
-                map.put(key, new LicenseInfo(spdxId, name, risk));
-            }
+            return parse(new String(is.readAllBytes(), StandardCharsets.UTF_8));
         } catch (IOException e) {
             System.err.println("WARN: licenses.json 加载失败: " + e.getMessage());
+            return new HashMap<>();
+        }
+    }
+
+    private Map<String, LicenseInfo> loadExternal(Path path) {
+        if (!Files.isRegularFile(path)) {
+            System.err.println("WARN: 外置许可证快照不存在，回退内置快照: " + path);
+            return load();
+        }
+        try {
+            return parse(Files.readString(path, StandardCharsets.UTF_8));
+        } catch (IOException | JSONException e) {
+            System.err.println("WARN: 外置许可证快照读取失败，回退内置快照: " + e.getMessage());
+            return load();
+        }
+    }
+
+    private static Map<String, LicenseInfo> parse(String content) {
+        Map<String, LicenseInfo> map = new HashMap<>();
+        JSONObject root = new JSONObject(content);
+        for (String key : root.keySet()) {
+            JSONObject obj = root.getJSONObject(key);
+            String spdxId = requiredString(obj, "spdxId");
+            String name = requiredString(obj, "name");
+            String riskStr = requiredString(obj, "risk");
+            RiskLevel risk;
+            try {
+                risk = RiskLevel.valueOf(riskStr);
+            } catch (IllegalArgumentException e) {
+                throw new JSONException("无效的 risk 值: " + riskStr);
+            }
+            map.put(key, new LicenseInfo(spdxId, name, risk));
         }
         return map;
+    }
+
+    private static String requiredString(JSONObject obj, String field) {
+        if (!obj.has(field) || obj.isNull(field)) {
+            throw new JSONException("缺少必需字段: " + field);
+        }
+        String value = obj.getString(field).trim();
+        if (value.isEmpty()) {
+            throw new JSONException("必需字段为空: " + field);
+        }
+        return value;
     }
 }

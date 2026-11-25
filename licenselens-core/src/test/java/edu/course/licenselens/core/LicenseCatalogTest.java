@@ -7,6 +7,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -19,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class LicenseCatalogTest {
 
     private LicenseCatalog catalog;
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() {
@@ -143,5 +152,78 @@ class LicenseCatalogTest {
             LicenseInfo info = catalog.lookup(dep);
             assertNotEquals(RiskLevel.UNKNOWN, info.risk(), "go 样例 uuid 应命中");
         }
+    }
+
+    // ---- 5. 外置快照 ----
+
+    @Test
+    @DisplayName("外置快照：自定义映射覆盖内置结果")
+    void shouldUseExternalCatalog() throws IOException {
+        Path external = tempDir.resolve("licenses.json");
+        Files.writeString(external, """
+                {
+                  "npm:lodash": {
+                    "spdxId": "GPL-3.0",
+                    "name": "GNU GPL v3",
+                    "risk": "STRONG_COPYLEFT"
+                  }
+                }
+                """, StandardCharsets.UTF_8);
+
+        LicenseInfo info = new LicenseCatalog(external).lookup(
+                new Dependency("npm", "lodash", "4.17.21", "runtime"));
+
+        assertEquals("GPL-3.0", info.spdxId());
+        assertEquals(RiskLevel.STRONG_COPYLEFT, info.risk());
+    }
+
+    @Test
+    @DisplayName("外置快照不存在：回退内置快照")
+    void shouldFallBackWhenExternalCatalogMissing() {
+        LicenseInfo info = new LicenseCatalog(tempDir.resolve("missing.json")).lookup(
+                new Dependency("npm", "lodash", "4.17.21", "runtime"));
+
+        assertEquals("MIT", info.spdxId());
+    }
+
+    @Test
+    @DisplayName("外置快照风险枚举非法：回退内置快照")
+    void shouldFallBackWhenExternalCatalogHasUnknownRisk() throws IOException {
+        Path external = tempDir.resolve("licenses.json");
+        Files.writeString(external, """
+                {
+                  "npm:lodash": {
+                    "spdxId": "GPL-3.0",
+                    "name": "GNU GPL v3",
+                    "risk": "STRONG_COPYLFT"
+                  }
+                }
+                """, StandardCharsets.UTF_8);
+
+        LicenseInfo info = new LicenseCatalog(external).lookup(
+                new Dependency("npm", "lodash", "4.17.21", "runtime"));
+
+        assertEquals("MIT", info.spdxId());
+        assertEquals(RiskLevel.PERMISSIVE, info.risk());
+    }
+
+    @Test
+    @DisplayName("外置快照缺少必需字段：回退内置快照")
+    void shouldFallBackWhenExternalCatalogMissingRequiredField() throws IOException {
+        Path external = tempDir.resolve("licenses.json");
+        Files.writeString(external, """
+                {
+                  "npm:lodash": {
+                    "name": "GNU GPL v3",
+                    "risk": "STRONG_COPYLEFT"
+                  }
+                }
+                """, StandardCharsets.UTF_8);
+
+        LicenseInfo info = new LicenseCatalog(external).lookup(
+                new Dependency("npm", "lodash", "4.17.21", "runtime"));
+
+        assertEquals("MIT", info.spdxId());
+        assertEquals(RiskLevel.PERMISSIVE, info.risk());
     }
 }
