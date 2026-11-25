@@ -149,6 +149,16 @@ class ScanEngineTest {
                 "应按 id() 字典序选中 a-stub，而不是先注入的 z-stub");
     }
 
+    @Test
+    @DisplayName("resolveDependencies 复用同一套解析器选择，只返回依赖、不生成报告")
+    void shouldResolveDependenciesWithoutScanning() throws SourceException {
+        List<Dependency> deps = engine.resolveDependencies(sample("demo-maven/pom.xml"));
+
+        assertEquals(4, deps.size());
+        assertTrue(deps.stream().anyMatch(dep -> "com.google.guava:guava".equals(dep.name())),
+                "应解析出 guava");
+    }
+
     private static Path sample(String relative) {
         return repoRoot().resolve("samples").resolve(relative);
     }

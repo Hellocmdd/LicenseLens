@@ -20,7 +20,7 @@
 
 **扩展新增能力**：通过独立 jar 接入新的清单格式。npm `package-lock.json`（v1/v2/v3）、Go `go.mod` 与 Python `requirements.txt` / `pyproject.toml` / `uv.lock` / `environment.yml` / `conda-lock.yml` 均已实现并合入 `master`（39 / 40 / 77 个契约测试）。插件 POM 可单独构建；根 reactor 的 `distribution` 模块会自动把 CLI 与所有插件 jar 装配到 `distribution/target/dist/`，无需手工复制，核心源码无需改动。
 
-**本次不做**：传递依赖分析、联网查询许可证、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容。许可证快照为课程级数据，结论不构成法律意见。
+**本次不做**：传递依赖分析、SBOM 导出、源码扫描、GUI、Gradle 解析器、插件市场、热加载、多版本兼容。在线许可证查询以默认关闭的 `--online` 提供补充展示（见“快速开始”），不写入报告；许可证快照为课程级数据，结论不构成法律意见。
 
 **项目起点**：课程提供的 `LicenseLens骨架.zip`（原始压缩包已移除，初始提交保留在 Git 历史中）。本次在其上完成核心链路实现、测试、Checkstyle 与 CI，并补齐样例与本文档。
 
@@ -102,6 +102,10 @@ java -jar licenselens-cli.jar scan \
 # 外置许可证快照：缺失或非法时自动回退内置 licenses.json
 java -jar licenselens-cli.jar scan \
   --manifest samples/demo-maven/pom.xml --catalog ./my-licenses.json --out report.md
+
+# 在线补充信息：默认关闭，结果只打印到终端，不写入报告
+java -jar licenselens-cli.jar scan \
+  --manifest samples/demo-maven/pom.xml --online
 ```
 
 终端摘要是一行，便于从 CI 日志里定位结果：
@@ -114,7 +118,9 @@ java -jar licenselens-cli.jar scan \
 
 报告写到 `--out` 指定的路径（默认 `./report.md`）。默认 Markdown 报告按风险降序、同风险按名称升序列出每个依赖的许可证、判定与理由；`--format json` 输出同样排序的 JSON，字段顺序固定，便于 CI 解析。
 
-参数：`--manifest <路径>`（必填）、`--policy campus|permissive-only`（默认 campus）、`--plugins <目录>`（默认 `./plugins`，目录不存在只告警）、`--catalog <路径>`（外置许可证快照，默认内置）、`--format markdown|json`（默认 markdown）、`--out <路径>`（默认 `./report.md`，父目录不存在会自动创建）。
+参数：`--manifest <路径>`（必填）、`--policy campus|permissive-only`（默认 campus）、`--plugins <目录>`（默认 `./plugins`，目录不存在只告警）、`--catalog <路径>`（外置许可证快照，默认内置）、`--format markdown|json`（默认 markdown）、`--out <路径>`（默认 `./report.md`，父目录不存在会自动创建）、`--online`（默认关闭，联网查询注册表补充许可证与最新版本，仅终端展示）。
+
+`--online` 在国内源优先的前提下查询注册表：npm 走 `registry.npmmirror.com`、PyPI 走清华镜像、Maven 走阿里云（均回退官方源）、Go 走 `goproxy.cn`，GitHub API 只用于取 Go 模块的许可证。每条依赖一次请求、3 秒超时、最多 4 线程并行；网络失败按 `OFFLINE` 降级，解析失败标记 `UNREADABLE`，未知生态（如 conda）标记 `SKIPPED`。在线结果只作终端补充展示，Markdown / JSON 报告保持离线确定性，退出码也不受其影响。
 
 退出码：`0` 正常 / `1` 存在阻断依赖 / `2` 清单文件不存在 / `3` 清单语法错误 / `4` 无可用解析器。参数错误（缺值、未知参数、未知策略、未知报告格式）当前也返回 `2`——契约退出码表暂无"用法错误"一档。详见 `docs/CONTRACT.md`。
 
@@ -171,7 +177,7 @@ java -jar licenselens-cli.jar scan \
 
 CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时触发，在 Ubuntu 与 Windows 双平台（matrix，`fail-fast: false`）上执行 `mvn -B clean verify`；该命令已覆盖核心、插件与装配模块。装配后还有一步 smoke：断言各生态基础样例在默认 `./plugins` 下的退出码与终端摘要（T7），并在移走 `plugins/` 后断言三种扩展清单返回 4、内置 Maven 样例仍可用（T8）。`.github/workflows/ci-npm-plugin.yml`、`.github/workflows/ci-go-plugin.yml` 与 `.github/workflows/ci-python-plugin.yml` 分别在 `feat/npm-parser`、`feat/go-parser`、`feat/python-plugin`、`feat/python-uv` 与 `feat/python-conda` 分支的 push 及 PR 到 `master` 时单独验证对应扩展；`.github/workflows/release.yml` 在 `v*` Tag 触发双平台打包。本地命令序列见“快速开始”；远端真实运行记录以 GitHub Actions 页面为准。
 
-测试已就位：根目录 `mvn -B clean verify` 运行 224 个用例（core 47 + cli 17 + npm 39 + Go 40 + Python 77 + it 4），覆盖核心链路、Maven 模块展开、外置快照与 JSON 报告、三种扩展及其新格式、插件加载错误路径与 CLI 端到端插件接入；同时产出可直接运行的 `distribution/target/dist/`。T7/T8 由 `licenselens-it` 的 JUnit 集成测试与 CI smoke 双平台共同覆盖：插件 jar 放入目录后自动发现并解析样例清单，移走后返回 4，损坏 jar 与服务声明错误的 jar 告警后跳过且不影响正常插件。实际执行结果：一条 `BUILD SUCCESS`，224 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
+测试已就位：根目录 `mvn -B clean verify` 运行 242 个用例（core 53 + cli 29 + npm 39 + Go 40 + Python 77 + it 4），覆盖核心链路、Maven 模块展开、外置快照与 JSON 报告、三种扩展及其新格式、插件加载错误路径与 CLI 端到端插件接入；同时产出可直接运行的 `distribution/target/dist/`。T7/T8 由 `licenselens-it` 的 JUnit 集成测试与 CI smoke 双平台共同覆盖：插件 jar 放入目录后自动发现并解析样例清单，移走后返回 4，损坏 jar 与服务声明错误的 jar 告警后跳过且不影响正常插件。实际执行结果：一条 `BUILD SUCCESS`，242 个测试全通过。故意改错演示：把报告排序比较器由风险降序改成升序，T1 变红；`git checkout --` 恢复后变绿。
 
 ## 协作与贡献入口
 
@@ -191,4 +197,4 @@ CI 配置在 `.github/workflows/ci.yml`，push / PR 到 `main` 或 `master` 时�
 
 项目采用 MIT License，理由：课程作业以开放协作为目标，MIT 条款简单、对依赖方限制最少。关键依赖：`org.json`（core 解析 `licenses.json`）、JUnit（测试）与 Maven 插件，均按其各自许可证使用，未在仓库中捆绑第三方二进制；`org.json` 的许可证条款（JSON License 及其历史附加条款）需在发布前核对。
 
-已知限制：`supports()` 对 npm 只认精确文件名 `package-lock.json`，对 Go 只认 `go.mod`，对 Python 认文件名含 `requirement` 的 `.txt/.in/.pip`，以及精确文件名 `pyproject.toml`、`uv.lock`、`environment.yml`/`environment.yaml`、`conda-lock.yml`/`conda-lock.yaml`；`uv.lock` 与 `conda-lock.yml` 按解析后的完整集合报告，不区分直接依赖与传递依赖；`environment.yml` 中 `pip:` 子列表按 PyPI 包（ecosystem `python`）记录，其余条目按 `conda` 记录，conda 包尚未收录 `conda:` 键所以多为 `UNKNOWN`（见 issue #15）；`*.v1.json`、`go.single-require.mod`、`bad-pyproject/`、`bad-environment/` 等 fixture 供契约测试使用，手工演示需复制改名；`licenses.json` 收录 54 条，按 `ecosystem:name` 精确匹配并回退纯名称，未命中才为 `UNKNOWN`；参数错误复用退出码 `2`，契约暂无“用法错误”一档；报告含生成时间，同一输入输出排序确定但字节不一致，跨平台路径分隔符也不同；外置快照只替换匹配表，缺失或非法时回退内置，JSON 报告字段顺序固定但同样含生成时间；Maven 解析器会递归展开 `<modules>` 并按依赖四元组去重，但不解析继承、属性占位符或 `<profiles>`，也不做传递依赖分析；策略选择统一由 `PolicyEngine.select()` 完成；`docs/DESIGN.docx` 已随工程提交，`release/RELEASE.md` 尚未完成。当前版本可对 Maven、npm、Go 与 Python 多种清单产出审计报告，不覆盖传递依赖分析、联网查询与源码扫描。
+已知限制：`supports()` 对 npm 只认精确文件名 `package-lock.json`，对 Go 只认 `go.mod`，对 Python 认文件名含 `requirement` 的 `.txt/.in/.pip`，以及精确文件名 `pyproject.toml`、`uv.lock`、`environment.yml`/`environment.yaml`、`conda-lock.yml`/`conda-lock.yaml`；`uv.lock` 与 `conda-lock.yml` 按解析后的完整集合报告，不区分直接依赖与传递依赖；`environment.yml` 中 `pip:` 子列表按 PyPI 包（ecosystem `python`）记录，其余条目按 `conda` 记录，conda 包尚未收录 `conda:` 键所以多为 `UNKNOWN`（见 issue #15）；`*.v1.json`、`go.single-require.mod`、`bad-pyproject/`、`bad-environment/` 等 fixture 供契约测试使用，手工演示需复制改名；`licenses.json` 收录 54 条，按 `ecosystem:name` 精确匹配并回退纯名称，未命中才为 `UNKNOWN`；参数错误复用退出码 `2`，契约暂无“用法错误”一档；报告含生成时间，同一输入输出排序确定但字节不一致，跨平台路径分隔符也不同；外置快照只替换匹配表，缺失或非法时回退内置，JSON 报告字段顺序固定但同样含生成时间；Maven 解析器会递归展开 `<modules>` 并按依赖四元组去重，但不解析继承、属性占位符或 `<profiles>`，也不做传递依赖分析；策略选择统一由 `PolicyEngine.select()` 完成；`docs/DESIGN.docx` 已随工程提交，`release/RELEASE.md` 尚未完成。当前版本可对 Maven、npm、Go 与 Python 多种清单产出审计报告，不覆盖传递依赖分析与源码扫描；`--online` 是默认关闭的可选补充查询，仅终端展示、不写报告，国内源优先并自动回退官方源，受网络状况与 GitHub 速率限制影响，不改变离线审计结论。

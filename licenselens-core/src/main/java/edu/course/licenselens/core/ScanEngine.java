@@ -60,30 +60,16 @@ public class ScanEngine {
     }
 
     /**
-     * 执行扫描。
+     * 解析清单中的依赖列表，不查许可证、不做策略判定。
+     * <p>
+     * 解析器选择与 {@link #scan(Path, String, String)} 完全一致（契约 §四），
+     * 供 CLI 的可选联网补充信息复用，避免在调用方重复实现选择逻辑。
      *
      * @param manifest 清单文件路径
-     * @param policyId 策略标识（"campus" 或 "permissive-only"）
-     * @return 扫描结果（含退出码和报告）
-     */
-    public ScanResult scan(Path manifest, String policyId) throws SourceException {
-        return scan(manifest, policyId, "markdown");
-    }
-
-    /**
-     * 执行扫描并按指定格式生成报告。
-     *
-     * @param manifest 清单文件路径
-     * @param policyId 策略标识（"campus" 或 "permissive-only"）
-     * @param format   报告格式，"markdown" 或 "json"
-     * @return 扫描结果（含退出码和报告）
+     * @return 解析出的依赖列表（顺序与解析器返回一致）
      * @throws SourceException 清单不存在、语法错误或没有解析器支持该格式
      */
-    public ScanResult scan(Path manifest, String policyId, String format) throws SourceException {
-        if (!"markdown".equals(format) && !"json".equals(format)) {
-            throw new IllegalArgumentException("不支持的报告格式: " + format);
-        }
-
+    public List<Dependency> resolveDependencies(Path manifest) throws SourceException {
         // 1. 文件校验
         if (!Files.exists(manifest)) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
@@ -131,7 +117,36 @@ public class ScanEngine {
         }
 
         // 4. 解析依赖列表
-        List<Dependency> deps = selected.parse(manifest);
+        return selected.parse(manifest);
+    }
+
+    /**
+     * 执行扫描。
+     *
+     * @param manifest 清单文件路径
+     * @param policyId 策略标识（"campus" 或 "permissive-only"）
+     * @return 扫描结果（含退出码和报告）
+     */
+    public ScanResult scan(Path manifest, String policyId) throws SourceException {
+        return scan(manifest, policyId, "markdown");
+    }
+
+    /**
+     * 执行扫描并按指定格式生成报告。
+     *
+     * @param manifest 清单文件路径
+     * @param policyId 策略标识（"campus" 或 "permissive-only"）
+     * @param format   报告格式，"markdown" 或 "json"
+     * @return 扫描结果（含退出码和报告）
+     * @throws SourceException 清单不存在、语法错误或没有解析器支持该格式
+     */
+    public ScanResult scan(Path manifest, String policyId, String format) throws SourceException {
+        if (!"markdown".equals(format) && !"json".equals(format)) {
+            throw new IllegalArgumentException("不支持的报告格式: " + format);
+        }
+
+        // 1-4. 校验文件、选择解析器、解析依赖列表
+        List<Dependency> deps = resolveDependencies(manifest);
 
         // 5. 选策略：统一走 PolicyEngine，避免与 CLI 各自实现一份选择逻辑
         Policy policy = policyEngine.select(policyId);
