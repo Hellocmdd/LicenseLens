@@ -96,9 +96,12 @@ public class ScanEngine {
         try (BufferedReader reader = Files.newBufferedReader(manifest, StandardCharsets.UTF_8)) {
             String line = reader.readLine();
             firstLine = line == null ? "" : line;
-        } catch (IOException e) {
+        } catch (FileNotFoundException e) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
-                    "无法读取文件: " + e.getMessage());
+                    "清单文件不存在: " + manifest);
+        } catch (IOException e) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "无法读取清单文件: " + e.getMessage());
         }
         ManifestRef ref = new ManifestRef(manifest, fileName, firstLine);
 
