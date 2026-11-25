@@ -10,6 +10,7 @@ import edu.course.licenselens.spi.RiskLevel;
 import edu.course.licenselens.spi.SourceException;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -95,9 +96,12 @@ public class ScanEngine {
         try (BufferedReader reader = Files.newBufferedReader(manifest, StandardCharsets.UTF_8)) {
             String line = reader.readLine();
             firstLine = line == null ? "" : line;
-        } catch (IOException e) {
+        } catch (FileNotFoundException e) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
-                    "无法读取文件: " + e.getMessage());
+                    "Manifest file not found: " + manifest);
+        } catch (IOException e) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "Cannot read manifest file: " + e.getMessage());
         }
         ManifestRef ref = new ManifestRef(manifest, fileName, firstLine);
 
