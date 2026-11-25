@@ -10,6 +10,7 @@ import edu.course.licenselens.spi.RiskLevel;
 import edu.course.licenselens.spi.SourceException;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
