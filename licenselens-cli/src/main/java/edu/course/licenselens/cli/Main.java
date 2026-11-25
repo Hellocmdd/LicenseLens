@@ -7,6 +7,7 @@ import edu.course.licenselens.core.PolicyEngine;
 import edu.course.licenselens.core.ScanEngine;
 import edu.course.licenselens.core.ScanResult;
 import edu.course.licenselens.core.internal.MavenManifestParser;
+import edu.course.licenselens.spi.Dependency;
 import edu.course.licenselens.spi.DependencySource;
 import edu.course.licenselens.spi.Policy;
 import edu.course.licenselens.spi.SourceException;
@@ -42,6 +43,7 @@ public class Main {
               --catalog <路径>     外置许可证快照（缺失或非法时回退内置）             [默认: 内置]
               --format <格式>      markdown | json                                    [默认: markdown]
               --out <路径>         报告输出路径                                     [默认: ./report.md]
+              --online            联网补充许可证与最新版本（国内源优先，仅终端展示）  [默认: 关闭]
               -h, --help           显示帮助""";
 
     private static final String DEFAULT_POLICY = "campus";
@@ -115,6 +117,10 @@ public class Main {
                     options.policyId(), result.totalCount(),
                     result.blockedCount(), result.unknownCount());
 
+            if (options.online()) {
+                printOnline(engine, manifest);
+            }
+
             return ExitCode.fromValue(result.exitCode());
 
         } catch (SourceException e) {
@@ -140,6 +146,19 @@ public class Main {
     }
 
     /**
+     * 打印可选的联网补充信息；失败只告警，不影响扫描结论与退出码。
+     */
+    private static void printOnline(ScanEngine engine, Path manifest) {
+        try {
+            List<Dependency> dependencies = engine.resolveDependencies(manifest);
+            OnlineEnricher enricher = new OnlineEnricher();
+            enricher.print(System.out, enricher.enrich(dependencies));
+        } catch (SourceException e) {
+            System.err.println("WARN: 跳过联网补充信息: " + e.getMessage());
+        }
+    }
+
+    /**
      * 解析 {@code scan} 之后的参数；非法输入抛 {@link IllegalArgumentException}。
      */
     private static Options parseOptions(String[] args) {
@@ -149,6 +168,7 @@ public class Main {
         String catalogPath = null;
         String format = DEFAULT_FORMAT;
         String outPath = DEFAULT_OUT;
+        boolean online = false;
 
         for (int i = 1; i < args.length; i++) {
             String flag = args[i];
@@ -159,6 +179,7 @@ public class Main {
                 case "--catalog" -> catalogPath = requireValue(args, ++i, flag);
                 case "--format" -> format = requireValue(args, ++i, flag);
                 case "--out" -> outPath = requireValue(args, ++i, flag);
+                case "--online" -> online = true;
                 default -> throw new IllegalArgumentException("未知参数: " + flag);
             }
         }
@@ -167,7 +188,7 @@ public class Main {
             throw new IllegalArgumentException("缺少必填参数: --manifest");
         }
         return new Options(Path.of(manifestPath), policyId, Path.of(pluginsDir),
-                catalogPath == null ? null : Path.of(catalogPath), format, Path.of(outPath));
+                catalogPath == null ? null : Path.of(catalogPath), format, Path.of(outPath), online);
     }
 
     private static String requireValue(String[] args, int index, String flag) {
@@ -218,6 +239,6 @@ public class Main {
 
     /** 解析后的命令参数。 */
     private record Options(Path manifest, String policyId, Path pluginsDir, Path catalog,
-                           String format, Path out) {
+                           String format, Path out, boolean online) {
     }
 }
