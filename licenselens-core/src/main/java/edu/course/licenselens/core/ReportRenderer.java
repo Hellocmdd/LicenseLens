@@ -37,6 +37,25 @@ public class ReportRenderer {
     public record ScanRow(Dependency dep, LicenseInfo license, Decision decision) {}
 
     /**
+     * 报告摘要统计。两个 Renderer 共用，避免各自重复实现 stream filter。
+     *
+     * @param total   依赖总数
+     * @param blocked 阻断数（decision.allowed() = false）
+     * @param warned  警告数（decision.warning() = true）
+     * @param unknown 未知许可证数（risk = UNKNOWN）
+     */
+    record ScanStats(int total, long blocked, long warned, long unknown) {
+
+        static ScanStats from(List<ScanRow> rows) {
+            int total = rows.size();
+            long blocked = rows.stream().filter(r -> !r.decision().allowed()).count();
+            long warned = rows.stream().filter(r -> r.decision().warning()).count();
+            long unknown = rows.stream().filter(r -> r.license().risk() == RiskLevel.UNKNOWN).count();
+            return new ScanStats(total, blocked, warned, unknown);
+        }
+    }
+
+    /**
      * 渲染完整 Markdown 报告。
      *
      * @param rows     扫描结果行（排序在此方法内完成）
@@ -48,10 +67,7 @@ public class ReportRenderer {
         List<ScanRow> sorted = new ArrayList<>(rows);
         sorted.sort(SORTER);
 
-        int total = sorted.size();
-        long blocked = sorted.stream().filter(r -> !r.decision().allowed()).count();
-        long warned = sorted.stream().filter(r -> r.decision().warning()).count();
-        long unknown = sorted.stream().filter(r -> r.license().risk() == RiskLevel.UNKNOWN).count();
+        ScanStats stats = ScanStats.from(sorted);
 
         StringBuilder sb = new StringBuilder();
         sb.append("# LicenseLens 审计报告\n\n");
@@ -61,10 +77,10 @@ public class ReportRenderer {
 
         sb.append("## 摘要\n\n");
         sb.append("| 指标 | 数值 |\n|---|---|\n");
-        sb.append("| 依赖总数 | ").append(total).append(" |\n");
-        sb.append("| 阻断依赖 | ").append(blocked).append(" |\n");
-        sb.append("| 警告依赖 | ").append(warned).append(" |\n");
-        sb.append("| 未知许可证 | ").append(unknown).append(" |\n\n");
+        sb.append("| 依赖总数 | ").append(stats.total()).append(" |\n");
+        sb.append("| 阻断依赖 | ").append(stats.blocked()).append(" |\n");
+        sb.append("| 警告依赖 | ").append(stats.warned()).append(" |\n");
+        sb.append("| 未知许可证 | ").append(stats.unknown()).append(" |\n\n");
 
         sb.append("## 详细结果\n\n");
         sb.append("| 风险 | 依赖 | 许可证 | 策略决策 | 理由 |\n");
@@ -85,9 +101,9 @@ public class ReportRenderer {
         }
         sb.append("\n");
 
-        if (blocked > 0) {
+        if (stats.blocked() > 0) {
             sb.append("## ⚠️ 审计未通过\n\n");
-            sb.append("存在 ").append(blocked).append(" 个阻断依赖，请在合并或发布前处理。\n");
+            sb.append("存在 ").append(stats.blocked()).append(" 个阻断依赖，请在合并或发布前处理。\n");
         } else {
             sb.append("## ✅ 审计通过\n\n");
             sb.append("所有依赖符合策略要求。\n");
