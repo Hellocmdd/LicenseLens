@@ -104,11 +104,11 @@ public class ScanEngine {
                     break;
                 }
             } catch (RuntimeException e) {
-                System.err.println("WARN: 解析器 " + src.id()
-                        + " 的 supports 抛异常（已跳过）: " + e.getMessage());
+                System.err.println("WARN: DependencySource " + src.id()
+                        + ".supports() threw exception (skipped): " + e.getMessage());
             } catch (LinkageError e) {
-                System.err.println("WARN: 解析器 " + src.id()
-                        + " 的 supports 链接失败（已跳过）: " + e.getMessage());
+                System.err.println("WARN: DependencySource " + src.id()
+                        + ".supports() failed linkage (skipped): " + e.getMessage());
             }
         }
         if (selected == null) {
