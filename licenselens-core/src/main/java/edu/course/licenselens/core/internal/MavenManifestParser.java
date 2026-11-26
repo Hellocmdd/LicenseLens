@@ -6,6 +6,7 @@ import edu.course.licenselens.spi.ManifestRef;
 import edu.course.licenselens.spi.SourceException;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -128,9 +129,12 @@ public class MavenManifestParser implements DependencySource {
                 }
             });
             doc = builder.parse(file.toFile());
-        } catch (IOException e) {
+        } catch (FileNotFoundException e) {
             throw new SourceException(SourceException.Code.FILE_NOT_FOUND,
-                    "无法读取文件: " + e.getMessage());
+                    "POM file not found: " + file);
+        } catch (IOException e) {
+            throw new SourceException(SourceException.Code.PARSE_ERROR,
+                    "Cannot read POM file: " + e.getMessage());
         } catch (SAXParseException e) {
             // SAXParseException 自带行号，优先用它；消息里的行号只是兜底
             throw new SourceException(SourceException.Code.PARSE_ERROR,
