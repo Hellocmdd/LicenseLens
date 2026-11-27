@@ -4,7 +4,6 @@ import edu.course.licenselens.spi.Decision;
 import edu.course.licenselens.spi.Dependency;
 import edu.course.licenselens.spi.LicenseInfo;
 import edu.course.licenselens.spi.Policy;
-import edu.course.licenselens.spi.RiskLevel;
 
 import org.json.JSONObject;
 
@@ -32,10 +31,7 @@ public class JsonReportRenderer {
         List<ReportRenderer.ScanRow> sorted = new ArrayList<>(rows);
         sorted.sort(ReportRenderer.SORTER);
 
-        int total = sorted.size();
-        long blocked = sorted.stream().filter(r -> !r.decision().allowed()).count();
-        long warned = sorted.stream().filter(r -> r.decision().warning()).count();
-        long unknown = sorted.stream().filter(r -> r.license().risk() == RiskLevel.UNKNOWN).count();
+        ReportRenderer.ScanStats stats = ReportRenderer.ScanStats.from(sorted);
 
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
@@ -43,10 +39,10 @@ public class JsonReportRenderer {
         sb.append("  \"policy\": ").append(quote(policy.id())).append(",\n");
         sb.append("  \"generatedAt\": ").append(quote(Instant.now().toString())).append(",\n");
         sb.append("  \"summary\": {\n");
-        sb.append("    \"total\": ").append(total).append(",\n");
-        sb.append("    \"blocked\": ").append(blocked).append(",\n");
-        sb.append("    \"warned\": ").append(warned).append(",\n");
-        sb.append("    \"unknown\": ").append(unknown).append("\n");
+        sb.append("    \"total\": ").append(stats.total()).append(",\n");
+        sb.append("    \"blocked\": ").append(stats.blocked()).append(",\n");
+        sb.append("    \"warned\": ").append(stats.warned()).append(",\n");
+        sb.append("    \"unknown\": ").append(stats.unknown()).append("\n");
         sb.append("  },\n");
         sb.append("  \"dependencies\": [\n");
         for (int i = 0; i < sorted.size(); i++) {
@@ -54,7 +50,7 @@ public class JsonReportRenderer {
             appendRow(sb, row, i == sorted.size() - 1);
         }
         sb.append("  ],\n");
-        sb.append("  \"result\": ").append(quote(blocked > 0 ? "BLOCKED" : "PASS")).append("\n");
+        sb.append("  \"result\": ").append(quote(stats.blocked() > 0 ? "BLOCKED" : "PASS")).append("\n");
         sb.append("}\n");
         return sb.toString();
     }

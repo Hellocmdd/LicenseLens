@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -69,7 +70,7 @@ public class LicenseCatalog {
     }
 
     Map<String, LicenseInfo> getEntries() {
-        return entries;
+        return Collections.unmodifiableMap(entries);
     }
 
     private Map<String, LicenseInfo> load() {
